@@ -1,0 +1,11 @@
+{
+  "name": "fitbit-dashboard",
+  "compatibility_date": "2024-03-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "pages_build_output_dir": ".next",
+  "vars": {
+    "AWS_REGION": "ap-northeast-1",
+    "ATHENA_DATABASE": "fitbit_db",
+    "ATHENA_OUTPUT_S3_PATH": "s3://fitbit-dashboard-athena-results/"
+  }
+}

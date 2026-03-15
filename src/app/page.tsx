@@ -1,65 +1,155 @@
-import Image from "next/image";
+import { Suspense } from "react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { StatsCard } from "@/components/dashboard/stats-card"
+import { StepChart, LowIntensityChart, SleepChart, HighIntensityChart } from "@/components/dashboard/charts"
+import { getSteps, getSleep, getLowIntensity, getActivity, getDataUpdateStatus } from "@/app/actions/athena-actions"
+import { Activity, Moon, Heart, RefreshCw, Flame, Zap } from "lucide-react"
+import Link from "next/link"
 
-export default function Home() {
+export const dynamic = 'force-dynamic'
+
+type PeriodOption = {
+  label: string;
+  amount: number;
+  unit: string;
+  key: string;
+}
+
+const PERIOD_OPTIONS: PeriodOption[] = [
+  { label: "1 Month", amount: 1, unit: "month", key: "1m" },
+  { label: "3 Months", amount: 3, unit: "month", key: "3m" },
+  { label: "1 Year", amount: 1, unit: "year", key: "1y" },
+  { label: "2 Years", amount: 2, unit: "year", key: "2y" },
+]
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>
+}) {
+  const currentKey = (await searchParams).period || "1m"
+  const selectedPeriod = PERIOD_OPTIONS.find(p => p.key === currentKey) || PERIOD_OPTIONS[0]
+
+  // Athenaからデータを取得（失敗時は空配列とする）
+  let steps: any[] = []
+  let sleep: any[] = []
+  let lowIntensity: any[] = []
+  let activity: any[] = []
+  let lastUpdated: string | null = null
+
+  try {
+    const [rawSteps, rawSleep, rawLowIntensity, rawActivity, status] = await Promise.all([
+      getSteps(selectedPeriod.amount, selectedPeriod.unit),
+      getSleep(selectedPeriod.amount, selectedPeriod.unit),
+      getLowIntensity(selectedPeriod.amount, selectedPeriod.unit),
+      getActivity(selectedPeriod.amount, selectedPeriod.unit),
+      getDataUpdateStatus()
+    ])
+
+    // 数値変換（Rechartsの表示を安定させるため）
+    steps = rawSteps.map((d: any) => ({ ...d, steps: Number(d.steps), steps_ma: d.steps_ma ? Number(d.steps_ma) : null }))
+    sleep = rawSleep.map((d: any) => ({ ...d, total_sleep_hour: Number(d.total_sleep_hour), total_sleep_hour_ma: d.total_sleep_hour_ma ? Number(d.total_sleep_hour_ma) : null }))
+    lowIntensity = rawLowIntensity.map((d: any) => ({ ...d, low_intensity_minutes: Number(d.low_intensity_minutes), low_intensity_ma: d.low_intensity_ma ? Number(d.low_intensity_ma) : null }))
+    activity = rawActivity.map((d: any) => ({ ...d, active_zone_minutes: Number(d.active_zone_minutes), active_zone_ma: d.active_zone_ma ? Number(d.active_zone_ma) : null }))
+    lastUpdated = status
+  } catch (error) {
+    console.error("Failed to fetch data from Athena:", error)
+  }
+
+  const latestSteps = steps.length > 0 ? steps[steps.length - 1].steps : 0
+  const latestSleep = sleep.length > 0 ? sleep[sleep.length - 1].total_sleep_hour : 0
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex-col md:flex">
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex items-center justify-between space-y-2">
+          <h2 className="text-3xl font-bold tracking-tight">Fitbit Dashboard</h2>
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 mr-4">
+              {PERIOD_OPTIONS.map((opt) => (
+                <Link
+                  key={opt.key}
+                  href={`/?period=${opt.key}`}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                    currentKey === opt.key
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted hover:bg-muted/80"
+                  }`}
+                >
+                  {opt.label}
+                </Link>
+              ))}
+            </div>
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <RefreshCw className="h-4 w-4" />
+              <span>Last updated: {lastUpdated || "Never"}</span>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatsCard
+            title="Today's Steps"
+            value={Number(latestSteps).toLocaleString()}
+            unit="steps"
+            icon={<Activity className="h-4 w-4 text-muted-foreground" />}
+          />
+          <StatsCard
+            title="Sleep Last Night"
+            value={parseFloat(latestSleep).toFixed(1)}
+            unit="hours"
+            icon={<Moon className="h-4 w-4 text-muted-foreground" />}
+          />
+          <StatsCard
+            title="Active Minutes"
+            value={activity.length > 0 ? activity[activity.length - 1].active_zone_minutes : "0"}
+            unit="min"
+            icon={<Flame className="h-4 w-4 text-muted-foreground" />}
+          />
+          <StatsCard
+            title="Low Intensity"
+            value={lowIntensity.length > 0 ? lowIntensity[lowIntensity.length - 1].low_intensity_minutes : "0"}
+            unit="min"
+            icon={<Zap className="h-4 w-4 text-muted-foreground" />}
+          />
         </div>
-      </main>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Step Count Trend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <StepChart data={steps} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Sleep Duration (Hours)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SleepChart data={sleep} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>High Intensity (Active Zone Minutes)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HighIntensityChart data={activity} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Low Intensity Minutes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LowIntensityChart data={lowIntensity} />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
-  );
+  )
 }
