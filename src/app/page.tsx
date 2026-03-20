@@ -7,6 +7,7 @@ import Link from "next/link"
 import { AthenaRow } from "@/lib/athena"
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'edge'
 
 type PeriodOption = {
   label: string;
