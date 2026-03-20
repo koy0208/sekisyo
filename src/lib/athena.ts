@@ -15,6 +15,7 @@ export const runAthenaQuery = async (query: string): Promise<AthenaRow[]> => {
     QueryString: query,
     QueryExecutionContext: { Database: process.env.ATHENA_DATABASE },
     ResultConfiguration: { OutputLocation: process.env.ATHENA_OUTPUT_S3_PATH },
+    WorkGroup: process.env.ATHENA_WORKGROUP || "sekisyo-workgroup",
   });
 
   const { QueryExecutionId } = await client.send(startCommand);
