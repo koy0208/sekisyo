@@ -1,12 +1,16 @@
 import { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand, GetQueryResultsCommand, GetQueryResultsCommandOutput } from "@aws-sdk/client-athena";
 
-const client = new AthenaClient({
-  region: process.env.AWS_REGION || "ap-northeast-1",
-});
-
 export type AthenaRow = Record<string, string | undefined>;
 
 export const runAthenaQuery = async (query: string): Promise<AthenaRow[]> => {
+  const client = new AthenaClient({
+    region: process.env.AWS_REGION || "ap-northeast-1",
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+    },
+  });
+
   const startCommand = new StartQueryExecutionCommand({
     QueryString: query,
     QueryExecutionContext: { Database: process.env.ATHENA_DATABASE },
