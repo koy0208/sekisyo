@@ -1,10 +1,12 @@
-import { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand, GetQueryResultsCommand } from "@aws-sdk/client-athena";
+import { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand, GetQueryResultsCommand, GetQueryResultsCommandOutput } from "@aws-sdk/client-athena";
 
 const client = new AthenaClient({
   region: process.env.AWS_REGION || "ap-northeast-1",
 });
 
-export const runAthenaQuery = async (query: string) => {
+export type AthenaRow = Record<string, string | undefined>;
+
+export const runAthenaQuery = async (query: string): Promise<AthenaRow[]> => {
   const startCommand = new StartQueryExecutionCommand({
     QueryString: query,
     QueryExecutionContext: { Database: process.env.ATHENA_DATABASE },
@@ -32,12 +34,22 @@ export const runAthenaQuery = async (query: string) => {
   return parseAthenaResults(results);
 };
 
-const parseAthenaResults = (results: any) => {
-  const columns = results.ResultSet.ResultSetMetadata.ColumnInfo.map((col: any) => col.Name);
-  return results.ResultSet.Rows.slice(1).map((row: any) => {
-    const data: Record<string, any> = {};
-    row.Data.forEach((val: any, i: number) => {
-      data[columns[i]] = val.VarCharValue;
+const parseAthenaResults = (results: GetQueryResultsCommandOutput): AthenaRow[] => {
+  const columnInfo = results.ResultSet?.ResultSetMetadata?.ColumnInfo;
+  const rows = results.ResultSet?.Rows;
+
+  if (!columnInfo || !rows) return [];
+
+  const columns = columnInfo.map((col) => col.Name || "");
+  
+  // The first row is the header, so we skip it
+  return rows.slice(1).map((row) => {
+    const data: AthenaRow = {};
+    row.Data?.forEach((val, i) => {
+      const columnName = columns[i];
+      if (columnName) {
+        data[columnName] = val.VarCharValue;
+      }
     });
     return data;
   });

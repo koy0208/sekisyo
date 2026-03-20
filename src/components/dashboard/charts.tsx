@@ -1,7 +1,7 @@
 'use client'
 
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Line, ComposedChart } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
+import { Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, Line, ComposedChart } from "recharts"
+import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 
 const chartConfig = {
   steps: {
@@ -45,7 +45,11 @@ const MA_LINE_PROPS = {
   dot: false,
 };
 
-export function StepChart({ data }: { data: any[] }) {
+interface ChartData {
+  date: string;
+}
+
+export function StepChart({ data }: { data: (ChartData & { steps: number; steps_ma: number | null })[] }) {
   return (
     <ChartContainer config={chartConfig} className="h-[350px] w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -61,7 +65,7 @@ export function StepChart({ data }: { data: any[] }) {
   )
 }
 
-export function LowIntensityChart({ data }: { data: any[] }) {
+export function LowIntensityChart({ data }: { data: (ChartData & { low_intensity_minutes: number; low_intensity_ma: number | null })[] }) {
   return (
     <ChartContainer config={chartConfig} className="h-[350px] w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -77,7 +81,7 @@ export function LowIntensityChart({ data }: { data: any[] }) {
   )
 }
 
-export function SleepChart({ data }: { data: any[] }) {
+export function SleepChart({ data }: { data: (ChartData & { total_sleep_hour: number; total_sleep_hour_ma: number | null })[] }) {
   return (
     <ChartContainer config={chartConfig} className="h-[350px] w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -93,7 +97,7 @@ export function SleepChart({ data }: { data: any[] }) {
   )
 }
 
-export function HighIntensityChart({ data }: { data: any[] }) {
+export function HighIntensityChart({ data }: { data: (ChartData & { active_zone_minutes: number; active_zone_ma: number | null })[] }) {
   return (
     <ChartContainer config={chartConfig} className="h-[350px] w-full">
       <ResponsiveContainer width="100%" height="100%">

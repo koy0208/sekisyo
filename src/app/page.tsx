@@ -1,11 +1,10 @@
-import { Suspense } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatsCard } from "@/components/dashboard/stats-card"
 import { StepChart, LowIntensityChart, SleepChart, HighIntensityChart } from "@/components/dashboard/charts"
 import { getSteps, getSleep, getLowIntensity, getActivity, getDataUpdateStatus } from "@/app/actions/athena-actions"
-import { Activity, Moon, Heart, RefreshCw, Flame, Zap } from "lucide-react"
+import { Activity, Moon, RefreshCw, Flame, Zap } from "lucide-react"
 import Link from "next/link"
+import { AthenaRow } from "@/lib/athena"
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +22,15 @@ const PERIOD_OPTIONS: PeriodOption[] = [
   { label: "2 Years", amount: 2, unit: "year", key: "2y" },
 ]
 
+interface BaseData {
+  date: string;
+}
+
+type StepData = BaseData & { steps: number; steps_ma: number | null };
+type SleepData = BaseData & { total_sleep_hour: number; total_sleep_hour_ma: number | null };
+type LowIntensityData = BaseData & { low_intensity_minutes: number; low_intensity_ma: number | null };
+type ActivityData = BaseData & { active_zone_minutes: number; active_zone_ma: number | null };
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -32,10 +40,10 @@ export default async function DashboardPage({
   const selectedPeriod = PERIOD_OPTIONS.find(p => p.key === currentKey) || PERIOD_OPTIONS[0]
 
   // Athenaからデータを取得（失敗時は空配列とする）
-  let steps: any[] = []
-  let sleep: any[] = []
-  let lowIntensity: any[] = []
-  let activity: any[] = []
+  let steps: StepData[] = []
+  let sleep: SleepData[] = []
+  let lowIntensity: LowIntensityData[] = []
+  let activity: ActivityData[] = []
   let lastUpdated: string | null = null
 
   try {
@@ -48,11 +56,27 @@ export default async function DashboardPage({
     ])
 
     // 数値変換（Rechartsの表示を安定させるため）
-    steps = rawSteps.map((d: any) => ({ ...d, steps: Number(d.steps), steps_ma: d.steps_ma ? Number(d.steps_ma) : null }))
-    sleep = rawSleep.map((d: any) => ({ ...d, total_sleep_hour: Number(d.total_sleep_hour), total_sleep_hour_ma: d.total_sleep_hour_ma ? Number(d.total_sleep_hour_ma) : null }))
-    lowIntensity = rawLowIntensity.map((d: any) => ({ ...d, low_intensity_minutes: Number(d.low_intensity_minutes), low_intensity_ma: d.low_intensity_ma ? Number(d.low_intensity_ma) : null }))
-    activity = rawActivity.map((d: any) => ({ ...d, active_zone_minutes: Number(d.active_zone_minutes), active_zone_ma: d.active_zone_ma ? Number(d.active_zone_ma) : null }))
-    lastUpdated = status
+    steps = rawSteps.map((d: AthenaRow) => ({ 
+      date: d.date || "", 
+      steps: Number(d.steps || 0), 
+      steps_ma: d.steps_ma ? Number(d.steps_ma) : null 
+    }))
+    sleep = rawSleep.map((d: AthenaRow) => ({ 
+      date: d.date || "", 
+      total_sleep_hour: Number(d.total_sleep_hour || 0), 
+      total_sleep_hour_ma: d.total_sleep_hour_ma ? Number(d.total_sleep_hour_ma) : null 
+    }))
+    lowIntensity = rawLowIntensity.map((d: AthenaRow) => ({ 
+      date: d.date || "", 
+      low_intensity_minutes: Number(d.low_intensity_minutes || 0), 
+      low_intensity_ma: d.low_intensity_ma ? Number(d.low_intensity_ma) : null 
+    }))
+    activity = rawActivity.map((d: AthenaRow) => ({ 
+      date: d.date || "", 
+      active_zone_minutes: Number(d.active_zone_minutes || 0), 
+      active_zone_ma: d.active_zone_ma ? Number(d.active_zone_ma) : null 
+    }))
+    lastUpdated = status ?? null
   } catch (error) {
     console.error("Failed to fetch data from Athena:", error)
   }
@@ -97,19 +121,19 @@ export default async function DashboardPage({
           />
           <StatsCard
             title="Sleep Last Night"
-            value={parseFloat(latestSleep).toFixed(1)}
+            value={Number(latestSleep).toFixed(1)}
             unit="hours"
             icon={<Moon className="h-4 w-4 text-muted-foreground" />}
           />
           <StatsCard
             title="Active Minutes"
-            value={activity.length > 0 ? activity[activity.length - 1].active_zone_minutes : "0"}
+            value={activity.length > 0 ? activity[activity.length - 1].active_zone_minutes.toString() : "0"}
             unit="min"
             icon={<Flame className="h-4 w-4 text-muted-foreground" />}
           />
           <StatsCard
             title="Low Intensity"
-            value={lowIntensity.length > 0 ? lowIntensity[lowIntensity.length - 1].low_intensity_minutes : "0"}
+            value={lowIntensity.length > 0 ? lowIntensity[lowIntensity.length - 1].low_intensity_minutes.toString() : "0"}
             unit="min"
             icon={<Zap className="h-4 w-4 text-muted-foreground" />}
           />
