@@ -1,5 +1,7 @@
 'use server'
 
+export const runtime = 'edge';
+
 import { runAthenaQuery } from "@/lib/athena";
 
 export async function getActivity(amount: number = 1, unit: string = 'month') {
