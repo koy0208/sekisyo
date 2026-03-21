@@ -60,22 +60,22 @@ export default async function DashboardPage({
     steps = rawSteps.map((d: AthenaRow) => ({ 
       date: d.date || "", 
       steps: Number(d.steps || 0), 
-      steps_ma: d.steps_ma ? Number(d.steps_ma) : null 
+      steps_ma: d.steps_ma !== undefined ? Number(d.steps_ma) : null 
     }))
     sleep = rawSleep.map((d: AthenaRow) => ({ 
       date: d.date || "", 
       total_sleep_hour: Number(d.total_sleep_hour || 0), 
-      total_sleep_hour_ma: d.total_sleep_hour_ma ? Number(d.total_sleep_hour_ma) : null 
+      total_sleep_hour_ma: d.total_sleep_hour_ma !== undefined ? Number(d.total_sleep_hour_ma) : null 
     }))
     lowIntensity = rawLowIntensity.map((d: AthenaRow) => ({ 
       date: d.date || "", 
       low_intensity_minutes: Number(d.low_intensity_minutes || 0), 
-      low_intensity_ma: d.low_intensity_ma ? Number(d.low_intensity_ma) : null 
+      low_intensity_ma: d.low_intensity_ma !== undefined ? Number(d.low_intensity_ma) : null 
     }))
     activity = rawActivity.map((d: AthenaRow) => ({ 
       date: d.date || "", 
       active_zone_minutes: Number(d.active_zone_minutes || 0), 
-      active_zone_ma: d.active_zone_ma ? Number(d.active_zone_ma) : null 
+      active_zone_ma: d.active_zone_ma !== undefined ? Number(d.active_zone_ma) : null 
     }))
     lastUpdated = status ?? null
   } catch (error) {
