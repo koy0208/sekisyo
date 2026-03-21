@@ -19,6 +19,7 @@ type PeriodOption = {
 const PERIOD_OPTIONS: PeriodOption[] = [
   { label: "1 Month", amount: 1, unit: "month", key: "1m" },
   { label: "3 Months", amount: 3, unit: "month", key: "3m" },
+  { label: "6 Months", amount: 6, unit: "month", key: "6m" },
   { label: "1 Year", amount: 1, unit: "year", key: "1y" },
   { label: "2 Years", amount: 2, unit: "year", key: "2y" },
 ]

@@ -10,37 +10,37 @@ const chartConfig = {
   },
   steps_ma: {
     label: "30d Moving Avg",
-    color: "var(--chart-5)",
+    color: "hsl(0 84.2% 60.2%)", // 赤っぽい色
   },
   low_intensity_minutes: {
     label: "Low Intensity",
-    color: "var(--chart-2)",
+    color: "var(--chart-1)",
   },
   low_intensity_ma: {
     label: "30d Moving Avg",
-    color: "var(--chart-5)",
+    color: "hsl(0 84.2% 60.2%)", // 赤っぽい色
   },
   total_sleep_hour: {
     label: "Sleep Hours",
-    color: "var(--chart-3)",
+    color: "var(--chart-1)",
   },
   total_sleep_hour_ma: {
     label: "30d Moving Avg",
-    color: "var(--chart-5)",
+    color: "hsl(0 84.2% 60.2%)", // 赤っぽい色
   },
   active_zone_minutes: {
     label: "High Intensity",
-    color: "var(--chart-4)",
+    color: "var(--chart-1)",
   },
   active_zone_ma: {
     label: "30d Moving Avg",
-    color: "var(--chart-5)",
+    color: "hsl(0 84.2% 60.2%)", // 赤っぽい色
   },
 } satisfies ChartConfig
 
 const MA_LINE_PROPS = {
   type: "monotone" as const,
-  stroke: "var(--chart-5)",
+  stroke: "hsl(0 84.2% 60.2%)", // 赤っぽい色
   strokeWidth: 2,
   dot: false,
 };
