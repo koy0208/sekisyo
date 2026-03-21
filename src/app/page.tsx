@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatsCard } from "@/components/dashboard/stats-card"
-import { StepChart, LowIntensityChart, SleepChart, HighIntensityChart } from "@/components/dashboard/charts"
+import { StepChart, LowIntensityChart, SleepChart, SleepScheduleChart, HighIntensityChart } from "@/components/dashboard/charts"
 import { getSteps, getSleep, getLowIntensity, getActivity, getDataUpdateStatus } from "@/app/actions/athena-actions"
 import { Activity, Moon, RefreshCw, Flame, Zap } from "lucide-react"
 import Link from "next/link"
@@ -29,7 +29,12 @@ interface BaseData {
 }
 
 type StepData = BaseData & { steps: number; steps_ma: number | null };
-type SleepData = BaseData & { total_sleep_hour: number; total_sleep_hour_ma: number | null };
+type SleepData = BaseData & { 
+  total_sleep_hour: number; 
+  total_sleep_hour_ma: number | null;
+  start_time: string;
+  end_time: string;
+};
 type LowIntensityData = BaseData & { low_intensity_minutes: number; low_intensity_ma: number | null };
 type ActivityData = BaseData & { active_zone_minutes: number; active_zone_ma: number | null };
 
@@ -66,7 +71,9 @@ export default async function DashboardPage({
     sleep = rawSleep.map((d: AthenaRow) => ({ 
       date: d.date || "", 
       total_sleep_hour: Number(d.total_sleep_hour || 0), 
-      total_sleep_hour_ma: d.total_sleep_hour_ma !== undefined ? Number(d.total_sleep_hour_ma) : null 
+      total_sleep_hour_ma: d.total_sleep_hour_ma !== undefined ? Number(d.total_sleep_hour_ma) : null,
+      start_time: d.start_time || "",
+      end_time: d.end_time || ""
     }))
     lowIntensity = rawLowIntensity.map((d: AthenaRow) => ({ 
       date: d.date || "", 
@@ -156,6 +163,14 @@ export default async function DashboardPage({
             </CardHeader>
             <CardContent>
               <SleepChart data={sleep} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Sleep Schedule (Bedtime & Wake-up)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SleepScheduleChart data={sleep} />
             </CardContent>
           </Card>
           <Card>

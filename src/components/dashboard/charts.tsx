@@ -1,6 +1,6 @@
 'use client'
 
-import { Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, Line, ComposedChart } from "recharts"
+import { Bar, XAxis, YAxis, Tooltip, Line, ComposedChart } from "recharts"
 import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 
 const chartConfig = {
@@ -27,6 +27,10 @@ const chartConfig = {
   total_sleep_hour_ma: {
     label: "30d Moving Avg",
     color: "hsl(0 84.2% 60.2%)", // 赤っぽい色
+  },
+  sleep_range: {
+    label: "Sleep Schedule",
+    color: "var(--chart-1)",
   },
   active_zone_minutes: {
     label: "High Intensity",
@@ -86,6 +90,67 @@ export function SleepChart({ data }: { data: (ChartData & { total_sleep_hour: nu
         <Tooltip content={<ChartTooltipContent />} />
         <Bar dataKey="total_sleep_hour" fill="var(--color-total_sleep_hour)" radius={[4, 4, 0, 0]} />
         <Line dataKey="total_sleep_hour_ma" {...MA_LINE_PROPS} />
+      </ComposedChart>
+    </ChartContainer>
+  )
+}
+
+export function SleepScheduleChart({ data }: { data: (ChartData & { start_time: string; end_time: string })[] }) {
+  const processedData = data.map(d => {
+    const dateStr = d.date;
+    const start = new Date(d.start_time);
+    const end = new Date(d.end_time);
+    
+    // Calculate hours from midnight of the 'date'
+    // If date is "2024-11-29", midnight is 2024-11-29T00:00:00
+    const midnight = new Date(`${dateStr}T00:00:00`);
+    
+    let startOffset = (start.getTime() - midnight.getTime()) / (1000 * 60 * 60);
+    let endOffset = (end.getTime() - midnight.getTime()) / (1000 * 60 * 60);
+
+    // If start is more than 18 hours after midnight, it's probably for the previous day's sleep ending on this date
+    if (startOffset > 18) {
+      startOffset -= 24;
+      endOffset -= 24;
+    } else if (startOffset < -12) {
+      startOffset += 24;
+      endOffset += 24;
+    }
+    
+    return {
+      ...d,
+      range: [startOffset, endOffset],
+      startLabel: start.toLocaleTimeString("ja-JP", { hour: '2-digit', minute: '2-digit' }),
+      endLabel: end.toLocaleTimeString("ja-JP", { hour: '2-digit', minute: '2-digit' }),
+    };
+  });
+
+  return (
+    <ChartContainer config={chartConfig} className="h-[350px] w-full">
+      <ComposedChart data={processedData}>
+        <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+        <YAxis 
+          domain={[-4, 12]} // 20:00 (prev day) to 12:00 (next day)
+          ticks={[-4, -2, 0, 2, 4, 6, 8, 10, 12]}
+          stroke="#888888" 
+          fontSize={12} 
+          tickLine={false} 
+          axisLine={false} 
+          tickFormatter={(val) => {
+            const h = (val + 24) % 24;
+            return `${h.toString().padStart(2, '0')}:00`;
+          }}
+        />
+        <Tooltip 
+          content={<ChartTooltipContent />} 
+          formatter={(value: number | [number, number], name: string, props: { payload: { startLabel: string; endLabel: string } }) => {
+            if (name === "range") {
+              return [`${props.payload.startLabel} - ${props.payload.endLabel}`, "Sleep Interval"];
+            }
+            return [value, name];
+          }}
+        />
+        <Bar dataKey="range" fill="var(--color-total_sleep_hour)" radius={[4, 4, 4, 4]} />
       </ComposedChart>
     </ChartContainer>
   )
