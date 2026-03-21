@@ -143,9 +143,9 @@ export function SleepScheduleChart({ data }: { data: (ChartData & { start_time: 
         />
         <Tooltip 
           content={<ChartTooltipContent />} 
-          formatter={(value: number | [number, number], name: string, props: { payload: { startLabel: string; endLabel: string } }) => {
-            if (name === "range") {
-              return [`${props.payload.startLabel} - ${props.payload.endLabel}`, "Sleep Interval"];
+          formatter={(value: number | [number, number], name: string, item: { payload?: { startLabel: string; endLabel: string; } }) => {
+            if (name === "range" && item.payload) {
+              return [`${item.payload.startLabel} - ${item.payload.endLabel}`, "Sleep Interval"];
             }
             return [value, name];
           }}
