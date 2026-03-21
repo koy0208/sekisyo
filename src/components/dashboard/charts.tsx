@@ -1,6 +1,6 @@
 'use client'
 
-import { Bar, XAxis, YAxis, Tooltip, Line, ComposedChart } from "recharts"
+import { Area, Bar, XAxis, YAxis, Tooltip, Line, ComposedChart } from "recharts"
 import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 
 const chartConfig = {
@@ -130,7 +130,7 @@ export function SleepScheduleChart({ data }: { data: (ChartData & { start_time: 
       <ComposedChart data={processedData}>
         <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
         <YAxis 
-          domain={[-4, 12]} // 20:00 (prev day) to 12:00 (next day)
+          domain={[12, -4]} // Inverted: 12:00 at bottom, 20:00 at top
           ticks={[-4, -2, 0, 2, 4, 6, 8, 10, 12]}
           stroke="#888888" 
           fontSize={12} 
@@ -150,7 +150,7 @@ export function SleepScheduleChart({ data }: { data: (ChartData & { start_time: 
             return [value, name];
           }}
         />
-        <Bar dataKey="range" fill="var(--color-total_sleep_hour)" radius={[4, 4, 4, 4]} />
+        <Area dataKey="range" fill="var(--color-total_sleep_hour)" stroke="var(--color-total_sleep_hour)" />
       </ComposedChart>
     </ChartContainer>
   )
