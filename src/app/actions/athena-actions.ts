@@ -44,26 +44,48 @@ export async function getLowIntensity(amount: number = 1, unit: string = 'month'
 
 export async function getSleep(amount: number = 1, unit: string = 'month') {
   const query = `
-    SELECT date, val as total_sleep_hour, ma as total_sleep_hour_ma, start_time, end_time
-    FROM (
-      SELECT 
-        date, 
-        val,
-        AVG(val) OVER (ORDER BY date ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) as ma,
+    WITH daily_totals AS (
+      -- 1. 日付ごとの合計睡眠時間(val)を算出
+      SELECT
+        date,
+        SUM(total_sleep_hour) as val
+      FROM fitbit.sleep
+      GROUP BY date
+    ),
+    main_sleep_session AS (
+      -- 2. 日付ごとの主睡眠（最も長い睡眠）の開始・終了時刻を特定
+      SELECT
+        date,
         start_time,
         end_time
       FROM (
-        SELECT 
-          date, 
-          SUM(total_sleep_hour) as val, 
-          MIN(start_time) as start_time, 
-          MAX(end_time) as end_time
+        SELECT
+          date,
+          start_time,
+          end_time,
+          -- PARTITION BY dateで日付ごとにグループ化し、
+          -- ORDER BY total_sleep_hour DESCで睡眠時間が長い順に並べ、
+          -- ROW_NUMBER()で連番を振る
+          ROW_NUMBER() OVER(PARTITION BY date ORDER BY total_sleep_hour DESC) as rn
         FROM fitbit.sleep
-        GROUP BY date
-      )
+      ) AS ranked_sleep
+      -- 連番が1のもの（＝最も睡眠時間が長い）を抽出
+      WHERE rn = 1
     )
-    WHERE date >= cast(current_date - interval '${amount}' ${unit} as varchar)
-    ORDER BY date ASC
+    -- 3. 2つの結果を結合し、最終的な値を選択する
+    SELECT
+      dt.date,
+      dt.val as total_sleep_hour,
+      -- 合計睡眠時間の移動平均を計算
+      AVG(dt.val) OVER (ORDER BY dt.date ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) as total_sleep_hour_ma,
+      -- 主睡眠の開始時刻と終了時刻
+      mss.start_time,
+      mss.end_time
+    FROM daily_totals dt
+    -- daily_totalsを主軸に、main_sleep_sessionの情報を結合
+    LEFT JOIN main_sleep_session mss ON dt.date = mss.date
+    WHERE dt.date >= cast(current_date - interval '${amount}' ${unit} as varchar)
+    ORDER BY dt.date ASC;
   `;
   return await runAthenaQuery(query);
 }
