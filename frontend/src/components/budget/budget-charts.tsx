@@ -58,7 +58,8 @@ export function CumulativeSpendingChart({ data, currentLabel, previousLabel, tar
         />
         <Tooltip
           content={<ChartTooltipContent />}
-          labelFormatter={(day) => {
+          labelFormatter={(_value, payload) => {
+            const day = payload?.[0]?.payload?.day
             const [y, m] = targetMonth.split('-').map(Number)
             return `${y}年${m}月${day}日`
           }}
