@@ -1,0 +1,9 @@
+name = "sekisyo"
+compatibility_date = "2024-11-18"
+compatibility_flags = ["nodejs_compat_v2"]
+pages_build_output_dir = "frontend/.vercel/output/static"
+
+[vars]
+AWS_REGION = "ap-northeast-1"
+ATHENA_DATABASE = "fitbit_db"
+ATHENA_OUTPUT_S3_PATH = "s3://sekisyo-athena-results/"
