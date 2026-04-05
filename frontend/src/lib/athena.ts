@@ -2,7 +2,7 @@ import { AthenaClient, StartQueryExecutionCommand, GetQueryExecutionCommand, Get
 
 export type AthenaRow = Record<string, string | undefined>;
 
-export const runAthenaQuery = async (query: string): Promise<AthenaRow[]> => {
+export const runAthenaQuery = async (query: string, database?: string): Promise<AthenaRow[]> => {
   const client = new AthenaClient({
     region: process.env.AWS_REGION || "ap-northeast-1",
     credentials: {
@@ -13,7 +13,7 @@ export const runAthenaQuery = async (query: string): Promise<AthenaRow[]> => {
 
   const startCommand = new StartQueryExecutionCommand({
     QueryString: query,
-    QueryExecutionContext: { Database: process.env.ATHENA_DATABASE },
+    QueryExecutionContext: { Database: database ?? process.env.ATHENA_DATABASE },
     ResultConfiguration: { OutputLocation: process.env.ATHENA_OUTPUT_S3_PATH },
     WorkGroup: process.env.ATHENA_WORKGROUP || "sekisyo-workgroup",
   });
