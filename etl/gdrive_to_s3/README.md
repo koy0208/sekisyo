@@ -1,6 +1,7 @@
 ｀# Google Drive → S3 転送 Lambda
 
-Google Drive上の指定ファイルを `s3://fitbit-dashboard/data/gdrive/` に転送するLambda関数。
+Google Drive上の指定フォルダ内のファイルを S3 に転送するLambda関数。
+フォルダ内に同名ファイルがある場合は更新日が最新のもののみ転送する。
 毎週月曜 JST 04:00 にEventBridgeから自動実行される。
 
 ## 構成
@@ -36,20 +37,21 @@ aws secretsmanager create-secret \
 
 > JSON鍵の内容をそのままオブジェクトとして埋め込む。文字列として格納する場合はエスケープが必要。
 
-### 3. 転送対象ファイルIDの指定
+### 3. 転送対象フォルダIDの指定
 
-Google DriveのURLからファイルIDを取得する。
+Google DriveのURLからフォルダIDを取得する。
 
 ```
-https://docs.google.com/spreadsheets/d/<FILE_ID>/edit
-https://drive.google.com/file/d/<FILE_ID>/view
+https://drive.google.com/drive/folders/<FOLDER_ID>
 ```
-`infrastructure/lambda/gdrive.tf` の環境変数 `GDRIVE_FILE_IDS` にカンマ区切りで設定する。
+
+`infrastructure/lambda/gdrive.tf` の環境変数 `GDRIVE_FOLDER_IDS` に `folder_id:s3_prefix` 形式でカンマ区切りで設定する。
+s3_prefix を省略した場合は `data/gdrive/` がデフォルトで使用される。
 
 ```hcl
 environment {
   variables = {
-    GDRIVE_FILE_IDS = "1abc123def,2ghi456jkl"
+    GDRIVE_FOLDER_IDS = "1abc123def:data/household_budget/,2ghi456jkl:data/other/"
   }
 }
 ```

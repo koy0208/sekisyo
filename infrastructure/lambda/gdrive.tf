@@ -77,8 +77,8 @@ resource "aws_lambda_function" "gdrive_to_s3" {
 
   environment {
     variables = {
-      # フォーマット: "file_id:s3_prefix,file_id:s3_prefix,..."
-      GDRIVE_FILE_IDS = "17nDdSPoqxkHPeHYHuo5D19EhNuLnulDG:data/household_budget/"
+      # フォーマット: "folder_id:s3_prefix,folder_id:s3_prefix,..."
+      GDRIVE_FOLDER_IDS = "1tzfP5kWWsOBRwSMIt_OVYft9TmPnWOBw:data/household_budget/"
     }
   }
 
