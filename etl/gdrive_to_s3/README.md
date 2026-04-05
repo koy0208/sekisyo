@@ -44,7 +44,6 @@ Google DriveのURLからファイルIDを取得する。
 https://docs.google.com/spreadsheets/d/<FILE_ID>/edit
 https://drive.google.com/file/d/<FILE_ID>/view
 ```
-
 `infrastructure/lambda/gdrive.tf` の環境変数 `GDRIVE_FILE_IDS` にカンマ区切りで設定する。
 
 ```hcl

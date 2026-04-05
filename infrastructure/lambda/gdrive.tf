@@ -77,8 +77,8 @@ resource "aws_lambda_function" "gdrive_to_s3" {
 
   environment {
     variables = {
-      # カンマ区切りでGoogle DriveのファイルIDを指定
-      GDRIVE_FILE_IDS = ""
+      # フォーマット: "file_id:s3_prefix,file_id:s3_prefix,..."
+      GDRIVE_FILE_IDS = "17nDdSPoqxkHPeHYHuo5D19EhNuLnulDG:data/household_budget/"
     }
   }
 

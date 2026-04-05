@@ -2,7 +2,7 @@
 
 *python-version
 .DS_Store
-
+*.json
 # dependencies
 node_modules
 .pnp
@@ -52,3 +52,4 @@ next-env.d.ts
 *.tfvars.json
 *.tfplan
 .terraform.tfstate.lock.info
+*.hcl

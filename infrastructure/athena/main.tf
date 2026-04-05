@@ -102,6 +102,78 @@ resource "aws_iam_user_policy" "app_policy" {
   })
 }
 
+# Glue データベース
+resource "aws_glue_catalog_database" "main" {
+  name = var.project_name
+}
+
+# 家計簿テーブル (Google Drive CSV)
+resource "aws_glue_catalog_table" "household_budget" {
+  database_name = aws_glue_catalog_database.main.name
+  name          = "household_budget"
+
+  table_type = "EXTERNAL_TABLE"
+
+  parameters = {
+    "classification"  = "csv"
+    "skip.header.line.count" = "1"
+  }
+
+  storage_descriptor {
+    location      = "s3://fitbit-dashboard/data/household_budget/"
+    input_format  = "org.apache.hadoop.mapred.TextInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
+
+    ser_de_info {
+      serialization_library = "org.apache.hadoop.hive.serde2.OpenCSVSerde"
+      parameters = {
+        "separatorChar" = ","
+      }
+    }
+
+    columns {
+      name = "calculation_target"
+      type = "int"
+    }
+    columns {
+      name = "date"
+      type = "string"
+    }
+    columns {
+      name = "description"
+      type = "string"
+    }
+    columns {
+      name = "amount"
+      type = "int"
+    }
+    columns {
+      name = "financial_institution"
+      type = "string"
+    }
+    columns {
+      name = "major_category"
+      type = "string"
+    }
+    columns {
+      name = "sub_category"
+      type = "string"
+    }
+    columns {
+      name = "memo"
+      type = "string"
+    }
+    columns {
+      name = "transfer"
+      type = "int"
+    }
+    columns {
+      name = "id"
+      type = "string"
+    }
+  }
+}
+
 output "athena_workgroup_name" {
   value = aws_athena_workgroup.main.name
 }

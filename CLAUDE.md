@@ -68,3 +68,4 @@ Fitbit API / Google Drive → Lambda ETL → S3 (Parquet) → Athena → Next.js
 - コミットメッセージは Conventional Commits (`feat:`, `fix:`, `style:` 等)
 - フロントエンドのパスエイリアス: `@/*` → `frontend/src/*`
 - 環境変数は `frontend/.env.local` (git 管理外)
+- AWS CLI 実行時は `AWS_PROFILE=kapp-dev-user` を指定する

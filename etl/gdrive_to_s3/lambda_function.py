@@ -10,7 +10,7 @@ from googleapiclient.http import MediaIoBaseDownload
 
 SECRET_NAME = "prod/dashboard/gdrive"
 S3_BUCKET = "fitbit-dashboard"
-S3_PREFIX = "data/gdrive/"
+S3_DEFAULT_PREFIX = "data/gdrive/"
 
 s3_client = boto3.client("s3")
 
@@ -67,13 +67,13 @@ def download_file(service, file_id, mime_type):
     return buffer
 
 
-def determine_s3_key(file_name, mime_type):
+def determine_s3_key(file_name, mime_type, s3_prefix):
     """ファイル名とMIMEタイプからS3キーを決定"""
     if mime_type in EXPORT_MIME_TYPES:
         # Google Spreadsheet → CSV として保存
         base_name = os.path.splitext(file_name)[0]
-        return f"{S3_PREFIX}{base_name}.csv"
-    return f"{S3_PREFIX}{file_name}"
+        return f"{s3_prefix}{base_name}.csv"
+    return f"{s3_prefix}{file_name}"
 
 
 def upload_to_s3(buffer, s3_key):
@@ -97,11 +97,18 @@ def handler(event, context):
             "body": json.dumps({"message": "GDRIVE_FILE_IDS が設定されていません"}),
         }
 
-    file_ids = [fid.strip() for fid in file_ids_str.split(",") if fid.strip()]
+    # フォーマット: "file_id:s3_prefix,file_id:s3_prefix,..."
+    # s3_prefix省略時はデフォルトの data/gdrive/ を使用
+    file_entries = [entry.strip() for entry in file_ids_str.split(",") if entry.strip()]
     service = build_drive_service()
 
     results = []
-    for file_id in file_ids:
+    for entry in file_entries:
+        if ":" in entry:
+            file_id, s3_prefix = entry.split(":", 1)
+        else:
+            file_id, s3_prefix = entry, S3_DEFAULT_PREFIX
+
         # ファイルのメタデータを取得
         file_meta = service.files().get(
             fileId=file_id, fields="id,name,mimeType"
@@ -115,7 +122,7 @@ def handler(event, context):
         buffer = download_file(service, file_id, mime_type)
 
         # S3にアップロード
-        s3_key = determine_s3_key(file_name, mime_type)
+        s3_key = determine_s3_key(file_name, mime_type, s3_prefix)
         upload_to_s3(buffer, s3_key)
 
         results.append({"file": file_name, "s3_key": s3_key})
