@@ -27,10 +27,11 @@ interface CumulativeData {
   previous: number | null
 }
 
-export function CumulativeSpendingChart({ data, currentLabel, previousLabel }: {
+export function CumulativeSpendingChart({ data, currentLabel, previousLabel, targetMonth }: {
   data: CumulativeData[]
   currentLabel: string
   previousLabel: string
+  targetMonth: string
 }) {
   const config = {
     current: { label: currentLabel, color: "var(--chart-1)" },
@@ -57,6 +58,10 @@ export function CumulativeSpendingChart({ data, currentLabel, previousLabel }: {
         />
         <Tooltip
           content={<ChartTooltipContent />}
+          labelFormatter={(day) => {
+            const [y, m] = targetMonth.split('-').map(Number)
+            return `${y}年${m}月${day}日`
+          }}
           formatter={(value: number) => [`¥${Number(value).toLocaleString()}`, undefined]}
         />
         <Line

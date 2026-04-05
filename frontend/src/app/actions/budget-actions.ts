@@ -21,6 +21,7 @@ export async function getDailyCumulativeSpending(yearMonth: string) {
       FROM household_budget
       WHERE CAST(calculation_target AS INTEGER) = 1
         AND CAST(transfer AS INTEGER) = 0
+        AND CAST(amount AS INTEGER) > 0
         AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m') IN ('${yearMonth}', '${prev}')
       GROUP BY
         date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m'),
@@ -45,6 +46,7 @@ export async function getCategoryBreakdown(yearMonth: string) {
     FROM household_budget
     WHERE CAST(calculation_target AS INTEGER) = 1
       AND CAST(transfer AS INTEGER) = 0
+      AND CAST(amount AS INTEGER) > 0
       AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m') = '${yearMonth}'
     GROUP BY major_category
     ORDER BY total_amount DESC
@@ -61,6 +63,7 @@ export async function getMonthSummary(yearMonth: string) {
     FROM household_budget
     WHERE CAST(calculation_target AS INTEGER) = 1
       AND CAST(transfer AS INTEGER) = 0
+      AND CAST(amount AS INTEGER) > 0
       AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m') = '${yearMonth}'
   `;
   return await runAthenaQuery(query, BUDGET_DB);
@@ -75,6 +78,7 @@ export async function getMonthComparison(yearMonth: string) {
     FROM household_budget
     WHERE CAST(calculation_target AS INTEGER) = 1
       AND CAST(transfer AS INTEGER) = 0
+      AND CAST(amount AS INTEGER) > 0
       AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m') IN ('${yearMonth}', '${prev}')
     GROUP BY date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m')
     ORDER BY month ASC

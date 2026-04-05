@@ -152,6 +152,7 @@ export default async function BudgetPage({
                 data={cumulativeData}
                 currentLabel={formatYearMonth(targetMonth)}
                 previousLabel={formatYearMonth(prevMonth)}
+                targetMonth={targetMonth}
               />
             </CardContent>
           </Card>
