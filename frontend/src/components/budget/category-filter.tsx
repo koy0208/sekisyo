@@ -6,9 +6,10 @@ interface CategoryFilterProps {
   categories: string[]
   selected: Set<string>
   onChange: (selected: Set<string>) => void
+  colorMap?: Map<string, string>
 }
 
-export function CategoryFilter({ categories, selected, onChange }: CategoryFilterProps) {
+export function CategoryFilter({ categories, selected, onChange, colorMap }: CategoryFilterProps) {
   const allSelected = categories.length > 0 && selected.size === categories.length
 
   function toggleCategory(category: string) {
@@ -41,10 +42,17 @@ export function CategoryFilter({ categories, selected, onChange }: CategoryFilte
       {categories.map((cat) => (
         <Button
           key={cat}
-          variant={selected.has(cat) ? "secondary" : "outline"}
+          variant={selected.has(cat) ? "secondary" : "ghost"}
           size="xs"
+          className={!selected.has(cat) ? "opacity-50" : undefined}
           onClick={() => toggleCategory(cat)}
         >
+          {colorMap?.get(cat) && (
+            <span
+              className="inline-block h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: colorMap.get(cat) }}
+            />
+          )}
           {cat}
         </Button>
       ))}

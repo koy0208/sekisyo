@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DailyCategoryBarChart } from "@/components/budget/budget-charts"
+import { DailyCategoryBarChart, CHART_COLORS } from "@/components/budget/budget-charts"
 import { CategoryFilter } from "@/components/budget/category-filter"
 
 interface RawRow {
@@ -19,6 +19,11 @@ interface DailyCategoryCardProps {
 
 export function DailyCategoryCard({ data, categories, title }: DailyCategoryCardProps) {
   const [selected, setSelected] = useState(() => new Set(categories))
+
+  const colorMap = useMemo(
+    () => new Map(categories.map((cat, i) => [cat, CHART_COLORS[i % CHART_COLORS.length]])),
+    [categories]
+  )
 
   const activeCategories = useMemo(
     () => categories.filter((c) => selected.has(c)),
@@ -50,10 +55,11 @@ export function DailyCategoryCard({ data, categories, title }: DailyCategoryCard
           categories={categories}
           selected={selected}
           onChange={setSelected}
+          colorMap={colorMap}
         />
       </CardHeader>
       <CardContent>
-        <DailyCategoryBarChart data={chartData} categories={activeCategories} />
+        <DailyCategoryBarChart data={chartData} categories={activeCategories} colorMap={colorMap} />
       </CardContent>
     </Card>
   )

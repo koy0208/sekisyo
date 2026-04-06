@@ -1,9 +1,9 @@
 'use client'
 
-import { Bar, XAxis, YAxis, Tooltip, Line, ComposedChart, Cell } from "recharts"
-import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
+import { Bar, XAxis, YAxis, Tooltip, Legend, Line, ComposedChart, Cell } from "recharts"
+import { ChartContainer, ChartTooltipContent, ChartLegendContent, type ChartConfig } from "@/components/ui/chart"
 
-const CHART_COLORS = [
+export const CHART_COLORS = [
   "var(--chart-1)",
   "var(--chart-2)",
   "var(--chart-3)",
@@ -57,13 +57,12 @@ export function CumulativeSpendingChart({ data, currentLabel, previousLabel, tar
           tickFormatter={(val) => `${(val / 10000).toFixed(0)}万`}
         />
         <Tooltip
-          content={<ChartTooltipContent />}
+          content={<ChartTooltipContent valueFormatter={(v) => `¥${v.toLocaleString()}`} />}
           labelFormatter={(_value, payload) => {
             const day = payload?.[0]?.payload?.day
             const [y, m] = targetMonth.split('-').map(Number)
             return `${y}年${m}月${day}日`
           }}
-          formatter={(value: number) => [`¥${Number(value).toLocaleString()}`, undefined]}
         />
         <Line
           dataKey="current"
@@ -92,12 +91,16 @@ interface DailyCategoryData {
   [category: string]: string | number
 }
 
-export function DailyCategoryBarChart({ data, categories }: {
+export function DailyCategoryBarChart({ data, categories, colorMap }: {
   data: DailyCategoryData[]
   categories: string[]
+  colorMap?: Map<string, string>
 }) {
+  const getColor = (cat: string, i: number) =>
+    colorMap?.get(cat) ?? CHART_COLORS[i % CHART_COLORS.length]
+
   const config = Object.fromEntries(
-    categories.map((cat, i) => [cat, { label: cat, color: CHART_COLORS[i % CHART_COLORS.length] }])
+    categories.map((cat, i) => [cat, { label: cat, color: getColor(cat, i) }])
   ) satisfies ChartConfig
 
   return (
@@ -118,15 +121,15 @@ export function DailyCategoryBarChart({ data, categories }: {
           tickFormatter={(val) => `${(val / 10000).toFixed(0)}万`}
         />
         <Tooltip
-          content={<ChartTooltipContent />}
-          formatter={(value: number) => [`¥${Number(value).toLocaleString()}`, undefined]}
+          content={<ChartTooltipContent valueFormatter={(v) => `¥${v.toLocaleString()}`} />}
         />
+        <Legend content={<ChartLegendContent />} />
         {categories.map((cat, i) => (
           <Bar
             key={cat}
             dataKey={cat}
             stackId="a"
-            fill={CHART_COLORS[i % CHART_COLORS.length]}
+            fill={getColor(cat, i)}
             radius={i === categories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
           />
         ))}
@@ -162,8 +165,7 @@ export function CategoryBreakdownChart({ data }: { data: CategoryData[] }) {
           width={100}
         />
         <Tooltip
-          content={<ChartTooltipContent />}
-          formatter={(value: number) => [`¥${Number(value).toLocaleString()}`, undefined]}
+          content={<ChartTooltipContent valueFormatter={(v) => `¥${v.toLocaleString()}`} />}
         />
         <Bar dataKey="total_amount" radius={[0, 4, 4, 0]}>
           {data.map((_, index) => (
