@@ -9,7 +9,7 @@ interface CategoryFilterProps {
 }
 
 export function CategoryFilter({ categories, selected, onChange }: CategoryFilterProps) {
-  const allSelected = selected.size === categories.length
+  const allSelected = categories.length > 0 && selected.size === categories.length
 
   function toggleCategory(category: string) {
     const next = new Set(selected)

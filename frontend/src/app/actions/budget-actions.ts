@@ -126,14 +126,14 @@ export async function getDailyIncomeByPeriod(amount?: number, unit?: string) {
   const query = `
     SELECT
       ${dateKey} as date_key,
-      middle_category as category,
+      sub_category as category,
       SUM(CAST(amount AS INTEGER)) as daily_total
     FROM household_budget
     WHERE CAST(calculation_target AS INTEGER) = 1
       AND CAST(transfer AS INTEGER) = 0
       AND major_category = '収入'
       ${whereClause}
-    GROUP BY ${dateKey}, middle_category
+    GROUP BY ${dateKey}, sub_category
     ORDER BY date_key
   `;
   return await runAthenaQuery(query, BUDGET_DB);
