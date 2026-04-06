@@ -87,6 +87,54 @@ export function CumulativeSpendingChart({ data, currentLabel, previousLabel, tar
   )
 }
 
+interface DailyCategoryData {
+  date_key: string
+  [category: string]: string | number
+}
+
+export function DailyCategoryBarChart({ data, categories }: {
+  data: DailyCategoryData[]
+  categories: string[]
+}) {
+  const config = Object.fromEntries(
+    categories.map((cat, i) => [cat, { label: cat, color: CHART_COLORS[i % CHART_COLORS.length] }])
+  ) satisfies ChartConfig
+
+  return (
+    <ChartContainer config={config} className="h-[350px] w-full">
+      <ComposedChart data={data}>
+        <XAxis
+          dataKey="date_key"
+          stroke="#888888"
+          fontSize={12}
+          tickLine={false}
+          axisLine={false}
+        />
+        <YAxis
+          stroke="#888888"
+          fontSize={12}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={(val) => `${(val / 10000).toFixed(0)}万`}
+        />
+        <Tooltip
+          content={<ChartTooltipContent />}
+          formatter={(value: number) => [`¥${Number(value).toLocaleString()}`, undefined]}
+        />
+        {categories.map((cat, i) => (
+          <Bar
+            key={cat}
+            dataKey={cat}
+            stackId="a"
+            fill={CHART_COLORS[i % CHART_COLORS.length]}
+            radius={i === categories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+          />
+        ))}
+      </ComposedChart>
+    </ChartContainer>
+  )
+}
+
 interface CategoryData {
   major_category: string
   total_amount: number

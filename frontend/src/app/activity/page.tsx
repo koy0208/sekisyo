@@ -22,6 +22,7 @@ const PERIOD_OPTIONS: PeriodOption[] = [
   { label: "6 Months", amount: 6, unit: "month", key: "6m" },
   { label: "1 Year", amount: 1, unit: "year", key: "1y" },
   { label: "2 Years", amount: 2, unit: "year", key: "2y" },
+  { label: "All", amount: 0, unit: "all", key: "all" },
 ]
 
 interface BaseData {

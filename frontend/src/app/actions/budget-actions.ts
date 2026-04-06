@@ -69,6 +69,76 @@ export async function getMonthSummary(yearMonth: string) {
   return await runAthenaQuery(query, BUDGET_DB);
 }
 
+export async function getDailyCategorySpending(yearMonth: string) {
+  const prev = prevMonth(yearMonth)
+  const query = `
+    SELECT
+      date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m') as month,
+      day(date_parse(date, '%Y/%m/%d')) as day_of_month,
+      major_category,
+      SUM(CAST(amount AS INTEGER)) as daily_total
+    FROM household_budget
+    WHERE CAST(calculation_target AS INTEGER) = 1
+      AND CAST(transfer AS INTEGER) = 0
+      AND major_category <> '収入'
+      AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m') IN ('${yearMonth}', '${prev}')
+    GROUP BY
+      date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m'),
+      day(date_parse(date, '%Y/%m/%d')),
+      major_category
+    ORDER BY month, day_of_month
+  `;
+  return await runAthenaQuery(query, BUDGET_DB);
+}
+
+export async function getDailySpendingByPeriod(amount?: number, unit?: string) {
+  const isAll = amount === undefined || unit === undefined
+  const dateKey = isAll
+    ? "date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m')"
+    : "date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d')"
+  const whereClause = isAll
+    ? ''
+    : `AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d') >= date_format(current_date - interval '${amount}' ${unit}, '%Y-%m-%d')`
+  const query = `
+    SELECT
+      ${dateKey} as date_key,
+      major_category,
+      SUM(CAST(amount AS INTEGER)) as daily_total
+    FROM household_budget
+    WHERE CAST(calculation_target AS INTEGER) = 1
+      AND CAST(transfer AS INTEGER) = 0
+      AND major_category <> '収入'
+      ${whereClause}
+    GROUP BY ${dateKey}, major_category
+    ORDER BY date_key
+  `;
+  return await runAthenaQuery(query, BUDGET_DB);
+}
+
+export async function getDailyIncomeByPeriod(amount?: number, unit?: string) {
+  const isAll = amount === undefined || unit === undefined
+  const dateKey = isAll
+    ? "date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m')"
+    : "date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d')"
+  const whereClause = isAll
+    ? ''
+    : `AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d') >= date_format(current_date - interval '${amount}' ${unit}, '%Y-%m-%d')`
+  const query = `
+    SELECT
+      ${dateKey} as date_key,
+      middle_category as category,
+      SUM(CAST(amount AS INTEGER)) as daily_total
+    FROM household_budget
+    WHERE CAST(calculation_target AS INTEGER) = 1
+      AND CAST(transfer AS INTEGER) = 0
+      AND major_category = '収入'
+      ${whereClause}
+    GROUP BY ${dateKey}, middle_category
+    ORDER BY date_key
+  `;
+  return await runAthenaQuery(query, BUDGET_DB);
+}
+
 export async function getMonthComparison(yearMonth: string) {
   const prev = prevMonth(yearMonth)
   const query = `

@@ -63,6 +63,13 @@ Fitbit API / Google Drive → Lambda ETL → S3 (Parquet) → Athena → Next.js
 - `etl/fitbit_to_s3/lambda_function.py` - Fitbit ETL
 - `etl/gdrive_to_s3/lambda_function.py` - Google Drive ETL
 
+## Communication
+
+- 応答はすべて日本語で行うこと
+- 指示が曖昧な場合は、必要に応じて質問して明確化すること
+- 指示を盲目的に実行せず、シニアエンジニアとして設計判断やリスクを評価し、問題があれば代替案とともに指摘すること
+- 確認や選択を求める際は番号付きリストで提示し、ユーザーの自由入力を最小限にする
+
 ## Conventions
 
 - コミットメッセージは Conventional Commits (`feat:`, `fix:`, `style:` 等)

@@ -2,12 +2,32 @@
 
 import { runAthenaQuery } from "@/lib/athena";
 
+function isAllPeriod(unit: string) {
+  return unit === 'all'
+}
+
 export async function getActivity(amount: number = 1, unit: string = 'month') {
+  if (isAllPeriod(unit)) {
+    const query = `
+      SELECT
+        substr(date, 1, 7) as date,
+        ROUND(AVG(daily_total), 2) as active_zone_minutes,
+        null as active_zone_ma
+      FROM (
+        SELECT date, SUM(active_zone_minutes) as daily_total
+        FROM fitbit.activity
+        GROUP BY date
+      )
+      GROUP BY substr(date, 1, 7)
+      ORDER BY date ASC
+    `;
+    return await runAthenaQuery(query);
+  }
   const query = `
     SELECT date, val as active_zone_minutes, ma as active_zone_ma
     FROM (
-      SELECT 
-        date, 
+      SELECT
+        date,
         val,
         AVG(val) OVER (ORDER BY date ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) as ma
       FROM (
@@ -23,11 +43,27 @@ export async function getActivity(amount: number = 1, unit: string = 'month') {
 }
 
 export async function getLowIntensity(amount: number = 1, unit: string = 'month') {
+  if (isAllPeriod(unit)) {
+    const query = `
+      SELECT
+        substr(date, 1, 7) as date,
+        ROUND(AVG(daily_total), 2) as low_intensity_minutes,
+        null as low_intensity_ma
+      FROM (
+        SELECT date, SUM(low_intensity_minutes) as daily_total
+        FROM fitbit.low_intensity
+        GROUP BY date
+      )
+      GROUP BY substr(date, 1, 7)
+      ORDER BY date ASC
+    `;
+    return await runAthenaQuery(query);
+  }
   const query = `
     SELECT date, val as low_intensity_minutes, ma as low_intensity_ma
     FROM (
-      SELECT 
-        date, 
+      SELECT
+        date,
         val,
         AVG(val) OVER (ORDER BY date ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) as ma
       FROM (
@@ -43,9 +79,27 @@ export async function getLowIntensity(amount: number = 1, unit: string = 'month'
 }
 
 export async function getSleep(amount: number = 1, unit: string = 'month') {
+  if (isAllPeriod(unit)) {
+    const query = `
+      WITH daily_totals AS (
+        SELECT date, SUM(total_sleep_hour) as val
+        FROM fitbit.sleep
+        GROUP BY date
+      )
+      SELECT
+        substr(date, 1, 7) as date,
+        ROUND(AVG(val), 2) as total_sleep_hour,
+        null as total_sleep_hour_ma,
+        null as start_time,
+        null as end_time
+      FROM daily_totals
+      GROUP BY substr(date, 1, 7)
+      ORDER BY date ASC
+    `;
+    return await runAthenaQuery(query);
+  }
   const query = `
     WITH daily_totals AS (
-      -- 1. 日付ごとの合計睡眠時間(val)を算出
       SELECT
         date,
         SUM(total_sleep_hour) as val
@@ -53,7 +107,6 @@ export async function getSleep(amount: number = 1, unit: string = 'month') {
       GROUP BY date
     ),
     main_sleep_session AS (
-      -- 2. 日付ごとの主睡眠（最も長い睡眠）の開始・終了時刻を特定
       SELECT
         date,
         start_time,
@@ -63,26 +116,18 @@ export async function getSleep(amount: number = 1, unit: string = 'month') {
           date,
           start_time,
           end_time,
-          -- PARTITION BY dateで日付ごとにグループ化し、
-          -- ORDER BY total_sleep_hour DESCで睡眠時間が長い順に並べ、
-          -- ROW_NUMBER()で連番を振る
           ROW_NUMBER() OVER(PARTITION BY date ORDER BY total_sleep_hour DESC) as rn
         FROM fitbit.sleep
       ) AS ranked_sleep
-      -- 連番が1のもの（＝最も睡眠時間が長い）を抽出
       WHERE rn = 1
     )
-    -- 3. 2つの結果を結合し、最終的な値を選択する
     SELECT
       dt.date,
       dt.val as total_sleep_hour,
-      -- 合計睡眠時間の移動平均を計算
       AVG(dt.val) OVER (ORDER BY dt.date ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) as total_sleep_hour_ma,
-      -- 主睡眠の開始時刻と終了時刻
       mss.start_time,
       mss.end_time
     FROM daily_totals dt
-    -- daily_totalsを主軸に、main_sleep_sessionの情報を結合
     LEFT JOIN main_sleep_session mss ON dt.date = mss.date
     WHERE dt.date >= cast(current_date - interval '${amount}' ${unit} as varchar)
     ORDER BY dt.date ASC;
@@ -91,11 +136,27 @@ export async function getSleep(amount: number = 1, unit: string = 'month') {
 }
 
 export async function getSteps(amount: number = 1, unit: string = 'month') {
+  if (isAllPeriod(unit)) {
+    const query = `
+      SELECT
+        substr(date, 1, 7) as date,
+        ROUND(AVG(daily_total), 2) as steps,
+        null as steps_ma
+      FROM (
+        SELECT date, SUM(CAST(steps AS DOUBLE)) as daily_total
+        FROM fitbit.steps
+        GROUP BY date
+      )
+      GROUP BY substr(date, 1, 7)
+      ORDER BY date ASC
+    `;
+    return await runAthenaQuery(query);
+  }
   const query = `
     SELECT date, val as steps, ma as steps_ma
     FROM (
-      SELECT 
-        date, 
+      SELECT
+        date,
         val,
         AVG(val) OVER (ORDER BY date ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) as ma
       FROM (
