@@ -93,9 +93,10 @@ export async function getDailyCategorySpending(yearMonth: string) {
 
 export async function getDailySpendingByPeriod(amount?: number, unit?: string) {
   const isAll = amount === undefined || unit === undefined
-  const dateKey = isAll
+  const isMonthly = isAll || unit === 'year'
+  const dateKey = isMonthly
     ? "date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m')"
-    : "date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d')"
+    : "date_format(date_trunc('week', date_parse(date, '%Y/%m/%d')), '%Y-%m-%d')"
   const whereClause = isAll
     ? ''
     : `AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d') >= date_format(current_date - interval '${amount}' ${unit}, '%Y-%m-%d')`
@@ -117,9 +118,10 @@ export async function getDailySpendingByPeriod(amount?: number, unit?: string) {
 
 export async function getDailyIncomeByPeriod(amount?: number, unit?: string) {
   const isAll = amount === undefined || unit === undefined
-  const dateKey = isAll
+  const isMonthly = isAll || unit === 'year'
+  const dateKey = isMonthly
     ? "date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m')"
-    : "date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d')"
+    : "date_format(date_trunc('week', date_parse(date, '%Y/%m/%d')), '%Y-%m-%d')"
   const whereClause = isAll
     ? ''
     : `AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d') >= date_format(current_date - interval '${amount}' ${unit}, '%Y-%m-%d')`
