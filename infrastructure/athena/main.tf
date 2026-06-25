@@ -12,7 +12,7 @@ variable "project_name" {
 
 variable "data_bucket_arn" {
   description = "Sekisyoデータが格納されているS3バケットのARN"
-  default     = "arn:aws:s3:::fitbit-dashboard" 
+  default     = "arn:aws:s3:::fitbit-dashboard"
 }
 
 # Athena クエリ結果保存用バケット
@@ -71,7 +71,7 @@ resource "aws_iam_user_policy" "app_policy" {
           "s3:AbortMultipartUpload",
           "s3:PutObject"
         ]
-        Effect   = "Allow"
+        Effect = "Allow"
         Resource = [
           aws_s3_bucket.athena_results.arn,
           "${aws_s3_bucket.athena_results.arn}/*"
@@ -83,7 +83,7 @@ resource "aws_iam_user_policy" "app_policy" {
           "s3:GetObject",
           "s3:ListBucket"
         ]
-        Effect   = "Allow"
+        Effect = "Allow"
         Resource = [
           var.data_bucket_arn,
           "${var.data_bucket_arn}/*"
@@ -115,7 +115,7 @@ resource "aws_glue_catalog_table" "household_budget" {
   table_type = "EXTERNAL_TABLE"
 
   parameters = {
-    "classification"  = "csv"
+    "classification"         = "csv"
     "skip.header.line.count" = "1"
   }
 
@@ -169,6 +169,144 @@ resource "aws_glue_catalog_table" "household_budget" {
     }
     columns {
       name = "id"
+      type = "string"
+    }
+  }
+}
+
+# タイムライン: 滞在テーブル (Parquet, 単一ファイル上書き運用)
+# 件数は10年分でも約1.4万行と小規模なためパーティションは設けない。
+# 滞在時間の二重計上を避ける場合は WHERE hierarchy_level = 0 で絞る。
+resource "aws_glue_catalog_table" "timeline_visits" {
+  database_name = aws_glue_catalog_database.main.name
+  name          = "visits"
+  table_type    = "EXTERNAL_TABLE"
+
+  parameters = {
+    "classification" = "parquet"
+  }
+
+  storage_descriptor {
+    location      = "s3://fitbit-dashboard/data/timeline/visits/"
+    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+
+    ser_de_info {
+      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+    }
+
+    columns {
+      name = "start_time"
+      type = "timestamp"
+    }
+    columns {
+      name = "end_time"
+      type = "timestamp"
+    }
+    columns {
+      name = "hierarchy_level"
+      type = "int"
+    }
+    columns {
+      name = "place_id"
+      type = "string"
+    }
+    columns {
+      name = "semantic_type"
+      type = "string"
+    }
+    columns {
+      name = "lat"
+      type = "double"
+    }
+    columns {
+      name = "lng"
+      type = "double"
+    }
+    columns {
+      name = "probability"
+      type = "double"
+    }
+    columns {
+      name = "duration_min"
+      type = "bigint"
+    }
+    columns {
+      name = "date"
+      type = "string"
+    }
+    columns {
+      name = "place_name"
+      type = "string"
+    }
+    columns {
+      name = "place_address"
+      type = "string"
+    }
+  }
+}
+
+# タイムライン: 移動テーブル (Parquet, 単一ファイル上書き運用)
+resource "aws_glue_catalog_table" "timeline_activities" {
+  database_name = aws_glue_catalog_database.main.name
+  name          = "activities"
+  table_type    = "EXTERNAL_TABLE"
+
+  parameters = {
+    "classification" = "parquet"
+  }
+
+  storage_descriptor {
+    location      = "s3://fitbit-dashboard/data/timeline/activities/"
+    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+
+    ser_de_info {
+      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+    }
+
+    columns {
+      name = "start_time"
+      type = "timestamp"
+    }
+    columns {
+      name = "end_time"
+      type = "timestamp"
+    }
+    columns {
+      name = "activity_type"
+      type = "string"
+    }
+    columns {
+      name = "distance_m"
+      type = "double"
+    }
+    columns {
+      name = "start_lat"
+      type = "double"
+    }
+    columns {
+      name = "start_lng"
+      type = "double"
+    }
+    columns {
+      name = "end_lat"
+      type = "double"
+    }
+    columns {
+      name = "end_lng"
+      type = "double"
+    }
+    columns {
+      name = "probability"
+      type = "double"
+    }
+    columns {
+      name = "duration_min"
+      type = "bigint"
+    }
+    columns {
+      name = "date"
       type = "string"
     }
   }

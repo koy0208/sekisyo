@@ -45,11 +45,11 @@ data "aws_iam_policy_document" "lambda_policy" {
   }
 
   statement {
-    effect    = "Allow"
-    actions   = [
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:UpdateSecret"
-        ]
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:UpdateSecret"
+    ]
     resources = [
       data.aws_secretsmanager_secret.fitbit_secret.arn
     ]
@@ -78,8 +78,8 @@ resource "aws_iam_role_policy_attachment" "lambda_attach_policy" {
 # Streamlit 用の IAM ユーザーを作成
 data "aws_iam_policy_document" "streamlit_athena_policy" {
   statement {
-    effect    = "Allow"
-    actions   = [
+    effect = "Allow"
+    actions = [
       "athena:StartQueryExecution",
       "athena:GetQueryResults",
       "athena:GetQueryExecution",
@@ -110,7 +110,7 @@ data "aws_iam_policy_document" "streamlit_athena_policy" {
 
   # バケットの作成とロケーション取得を許可（リソースは CreateBucket の場合 "*" 固定）
   statement {
-    effect  = "Allow"
+    effect = "Allow"
     actions = [
       "s3:CreateBucket",
       "s3:GetBucketLocation"
@@ -135,13 +135,13 @@ resource "aws_iam_user_policy" "streamlit_athena_policy_attachment" {
 # 5. Lambda 関数 (Docker イメージ)
 #######################################
 resource "aws_lambda_function" "get_fitbit_api" {
-  function_name  = "fitbit-lambda-docker"
-  role           = aws_iam_role.lambda_execution_role.arn
-  package_type   = "Image"
-  
+  function_name = "fitbit-lambda-docker"
+  role          = aws_iam_role.lambda_execution_role.arn
+  package_type  = "Image"
+
   # ECR にプッシュしたイメージを指定
-  image_uri      = "${aws_ecr_repository.lambda_repo.repository_url}:latest"
-  
+  image_uri = "${aws_ecr_repository.lambda_repo.repository_url}:latest"
+
   # 環境変数の例 (Secrets Manager のシークレット名などを渡す)
   environment {
     variables = {
@@ -170,8 +170,8 @@ resource "aws_cloudwatch_event_rule" "scheduled_rule_jst_3am" {
 # EventBridge Target: 上記 Rule が発火したときに呼び出す Lambda
 # ---------------------------------------------------------------------
 resource "aws_cloudwatch_event_target" "scheduled_rule_jst_3am_target" {
-  rule      = aws_cloudwatch_event_rule.scheduled_rule_jst_3am.name
-  arn       = aws_lambda_function.get_fitbit_api.arn
+  rule = aws_cloudwatch_event_rule.scheduled_rule_jst_3am.name
+  arn  = aws_lambda_function.get_fitbit_api.arn
   # 任意で入力 (引数) を設定したい場合は input or input_path / input_transformer を指定
   # input = jsonencode({ example = "Hello" })
 }
