@@ -22,8 +22,20 @@ ACTIVITIES_KEY = f"{OUTPUT_PREFIX}activities/activities.parquet"
 PLACE_CACHE_KEY = f"{OUTPUT_PREFIX}place_cache/place_cache.parquet"
 
 PLACES_API_URL = "https://places.googleapis.com/v1/places/{place_id}"
-PLACES_FIELD_MASK = "displayName,formattedAddress,types,location"
+# すべて Pro ティア内のフィールド（追加課金なし）
+PLACES_FIELD_MASK = (
+    "displayName,formattedAddress,types,location,addressComponents,"
+    "primaryTypeDisplayName,googleMapsUri"
+)
 TZ = "Asia/Tokyo"
+
+# place_cache のスキーマ。addressComponents(都道府県/市区町村)・カテゴリ・マップURL対応。
+# 旧スキーマ(prefecture 列なし)を読んだ場合は、解決済みの場所のみ再取得して補完する
+# (resolve_place_ids 内で列の有無を見て移行)。
+PLACE_CACHE_COLUMNS = [
+    "place_id", "place_name", "place_address", "place_types", "place_category",
+    "prefecture", "municipality", "google_maps_uri", "lat", "lng", "resolved_at",
+]
 
 s3_client = boto3.client("s3")
 
@@ -164,24 +176,54 @@ def finalize_frame(df, dedup_keys):
 # ---------------------------------------------------------------------------
 # Places API による place_id 解決（キャッシュ付き）
 # ---------------------------------------------------------------------------
+def extract_admin_areas(address_components):
+    """addressComponents から都道府県・市区町村を取り出す。
+
+    日本の住所では:
+      administrative_area_level_1 → 都道府県 (例: 愛知県)
+      locality                    → 市/町/村 (例: 名古屋市, 稲沢市) や東京23区
+      sublocality_level_1         → 政令市の区 (例: 千種区)
+    市区町村は locality + sublocality_level_1 を連結する (例: 名古屋市千種区)。
+    """
+    by_type = {}
+    for comp in address_components or []:
+        text = comp.get("longText") or comp.get("shortText")
+        for t in comp.get("types", []):
+            by_type.setdefault(t, text)
+    prefecture = by_type.get("administrative_area_level_1")
+    locality = by_type.get("locality")
+    ward = by_type.get("sublocality_level_1")
+    municipality = "".join(part for part in (locality, ward) if part) or None
+    return prefecture, municipality
+
+
 def fetch_place_details(place_id, api_key):
     """Places API (New) で 1 件の場所詳細を取得。失敗時 None。"""
     try:
         resp = requests.get(
             PLACES_API_URL.format(place_id=place_id),
             headers={"X-Goog-Api-Key": api_key, "X-Goog-FieldMask": PLACES_FIELD_MASK},
+            # 都道府県/市区町村を日本語の構造化データで得る
+            params={"languageCode": "ja", "regionCode": "JP"},
             timeout=10,
         )
         if resp.status_code != 200:
-            print(f"Places API {resp.status_code} for {place_id}: {resp.text[:200]}")
+            # ログ肥大を防ぐため1行に圧縮（古いデータは無効 placeId の 404 が一定数出る）
+            msg = " ".join(resp.text.split())[:120]
+            print(f"Places API {resp.status_code} for {place_id}: {msg}")
             return None
         d = resp.json()
         loc = d.get("location", {})
+        prefecture, municipality = extract_admin_areas(d.get("addressComponents"))
         return {
             "place_id": place_id,
             "place_name": (d.get("displayName") or {}).get("text"),
             "place_address": d.get("formattedAddress"),
             "place_types": ",".join(d.get("types", []) or []),
+            "place_category": (d.get("primaryTypeDisplayName") or {}).get("text"),
+            "prefecture": prefecture,
+            "municipality": municipality,
+            "google_maps_uri": d.get("googleMapsUri"),
             "lat": loc.get("latitude"),
             "lng": loc.get("longitude"),
             "resolved_at": datetime.now(timezone.utc).replace(tzinfo=None),
@@ -204,14 +246,23 @@ def resolve_place_ids(place_ids, api_key):
     """
     cache = read_parquet_from_s3(PLACE_CACHE_KEY)
     if cache is None:
-        cache = pd.DataFrame(
-            columns=["place_id", "place_name", "place_address", "place_types",
-                     "lat", "lng", "resolved_at"]
-        )
+        cache = pd.DataFrame(columns=PLACE_CACHE_COLUMNS)
 
-    known = set(cache["place_id"].dropna().tolist())
+    # 旧スキーマ(prefecture 列なし)の移行: 解決済みの場所だけ再取得して
+    # 都道府県/市区町村を補完する。404 等の負キャッシュ(place_name が空)は
+    # 再試行しても無駄なのでそのまま skip する。
+    needs_migration = "prefecture" not in cache.columns
+    for col in PLACE_CACHE_COLUMNS:
+        if col not in cache.columns:
+            cache[col] = None
+
+    if needs_migration:
+        known = set(cache.loc[cache["place_name"].isna(), "place_id"].dropna())
+        print("place_cache を v2 スキーマへ移行: 解決済みの場所を再取得します")
+    else:
+        known = set(cache["place_id"].dropna().tolist())
     targets = [p for p in place_ids if p and p not in known]
-    print(f"place_id total={len(place_ids)} cached={len(known)} to_resolve={len(targets)}")
+    print(f"place_id total={len(place_ids)} cached_skip={len(known)} to_resolve={len(targets)}")
 
     if not api_key:
         print("GOOGLE_MAPS_API_KEY 未設定のため place_id 解決をスキップ")
@@ -234,7 +285,9 @@ def resolve_place_ids(place_ids, api_key):
             # 解決失敗も負キャッシュ（name/address は None）として記録
             row = {
                 "place_id": pid, "place_name": None, "place_address": None,
-                "place_types": None, "lat": None, "lng": None,
+                "place_types": None, "place_category": None,
+                "prefecture": None, "municipality": None, "google_maps_uri": None,
+                "lat": None, "lng": None,
                 "resolved_at": datetime.now(timezone.utc).replace(tzinfo=None),
             }
         new_rows.append(row)
@@ -248,10 +301,12 @@ def resolve_place_ids(place_ids, api_key):
 
 
 def attach_place_names(visits, cache):
-    """visits に place_cache の名前・住所を join。"""
+    """visits に place_cache の名前・住所・都道府県・市区町村を join。"""
     if visits.empty:
         return visits
-    lookup = cache[["place_id", "place_name", "place_address"]].drop_duplicates("place_id")
+    cols = ["place_id", "place_name", "place_address", "place_category",
+            "prefecture", "municipality", "google_maps_uri"]
+    lookup = cache[cols].drop_duplicates("place_id")
     return visits.merge(lookup, on="place_id", how="left")
 
 

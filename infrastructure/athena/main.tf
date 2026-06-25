@@ -243,6 +243,22 @@ resource "aws_glue_catalog_table" "timeline_visits" {
       name = "place_address"
       type = "string"
     }
+    columns {
+      name = "place_category"
+      type = "string"
+    }
+    columns {
+      name = "prefecture"
+      type = "string"
+    }
+    columns {
+      name = "municipality"
+      type = "string"
+    }
+    columns {
+      name = "google_maps_uri"
+      type = "string"
+    }
   }
 }
 

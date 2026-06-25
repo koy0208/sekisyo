@@ -30,11 +30,16 @@ JSON はフル履歴のエクスポートのため、毎回全件を読み直し
 
 ### visits（滞在）
 `start_time, end_time, duration_min, date, hierarchy_level, place_id, semantic_type,
-lat, lng, probability, place_name, place_address`
+lat, lng, probability, place_name, place_address, place_category, prefecture,
+municipality, google_maps_uri`
 
 - `hierarchy_level`: 0=広いエリア/建物, 1=その中の具体的な場所（入れ子）。
   滞在時間の二重計上を避ける集計では `WHERE hierarchy_level = 0` で絞る。
-- `place_name` / `place_address`: place_cache（Places API 解決結果）から付与。
+- `place_name` / `place_address` / `place_category` / `prefecture` / `municipality` /
+  `google_maps_uri`: place_cache（Places API 解決結果）から付与。
+  - `prefecture`: 都道府県（addressComponents の administrative_area_level_1, 日本語）
+  - `municipality`: 市区町村（locality + sublocality_level_1, 例: 名古屋市千種区）
+  - `place_category`: 主要カテゴリ（primaryTypeDisplayName, 例: ラーメン店）
 
 ### activities（移動）
 `start_time, end_time, duration_min, date, activity_type, distance_m,
