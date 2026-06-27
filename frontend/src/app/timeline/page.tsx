@@ -1,5 +1,5 @@
-import { TimelineExplorer, type RankRow, type VisitRow } from "@/components/timeline/timeline-explorer"
-import { getTimelineRanking, getTimelineVisits } from "@/app/actions/timeline-actions"
+import { TimelineExplorer, type RankRow } from "@/components/timeline/timeline-explorer"
+import { getTimelineRanking } from "@/app/actions/timeline-actions"
 import { AthenaRow } from "@/lib/athena"
 
 export const dynamic = 'force-dynamic'
@@ -7,14 +7,9 @@ export const runtime = 'edge'
 
 export default async function TimelinePage() {
   let records: RankRow[] = []
-  let detail: Record<string, VisitRow[]> = {}
 
   try {
-    const [rawRanking, rawVisits] = await Promise.all([
-      getTimelineRanking(),
-      getTimelineVisits(),
-    ])
-
+    const rawRanking = await getTimelineRanking()
     records = rawRanking.map((row: AthenaRow) => ({
       mon: row.mon || '',
       place_name: row.place_name || '不明',
@@ -22,18 +17,6 @@ export default async function TimelinePage() {
       visits: Number(row.visits || 0),
       hours: Number(row.hours || 0),
     }))
-
-    detail = {}
-    for (const row of rawVisits as AthenaRow[]) {
-      const name = row.place_name || '不明'
-      ;(detail[name] ??= []).push({
-        date: row.date || '',
-        dow: row.dow || '',
-        in: row.in_t || '',
-        out: row.out_t || '',
-        dur: Number(row.dur || 0),
-      })
-    }
   } catch (error) {
     console.error("Failed to fetch timeline data from Athena:", error)
   }
@@ -45,7 +28,7 @@ export default async function TimelinePage() {
         <p className="text-sm text-muted-foreground">
           外出先の滞在を集計したランキング（自宅除外）。期間の単位を切替え、場所をクリックで訪問の詳細を表示。
         </p>
-        <TimelineExplorer records={records} detail={detail} />
+        <TimelineExplorer records={records} />
       </div>
     </div>
   )

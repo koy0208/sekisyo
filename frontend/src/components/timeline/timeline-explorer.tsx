@@ -4,8 +4,10 @@ import { useMemo, useState } from "react"
 import { Bar, BarChart, XAxis, YAxis, Tooltip, Cell } from "recharts"
 import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { MapPin, X, ChevronRight, ChevronLeft } from "lucide-react"
+import { MapPin, X, ChevronRight, ChevronLeft, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getTimelinePlaceVisits } from "@/app/actions/timeline-actions"
+import { AthenaRow } from "@/lib/athena"
 
 export type RankRow = { mon: string; place_name: string; uri?: string; visits: number; hours: number }
 export type VisitRow = { date: string; dow: string; in: string; out: string; dur: number }
@@ -57,19 +59,38 @@ const chartConfig = {
   visits: { label: "回数", color: "var(--chart-1)" },
 } satisfies ChartConfig
 
-export function TimelineExplorer({
-  records,
-  detail,
-}: {
-  records: RankRow[]
-  detail: Record<string, VisitRow[]>
-}) {
+export function TimelineExplorer({ records }: { records: RankRow[] }) {
   const [unit, setUnit] = useState<Unit>("month")
   const [metric, setMetric] = useState<Metric>("hours")
   const [pos, setPos] = useState<number>(Number.MAX_SAFE_INTEGER)
   const [curName, setCurName] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>("date")
   const [sortDir, setSortDir] = useState<number>(-1)
+  // 訪問明細はクリック時に都度取得し、取得済みはキャッシュ
+  const [detailCache, setDetailCache] = useState<Record<string, VisitRow[]>>({})
+  const [loadingName, setLoadingName] = useState<string | null>(null)
+
+  async function selectPlace(name: string) {
+    setCurName(name)
+    if (detailCache[name]) return
+    setLoadingName(name)
+    try {
+      const rows = (await getTimelinePlaceVisits(name)) as AthenaRow[]
+      const mapped: VisitRow[] = rows.map((r) => ({
+        date: r.date || "",
+        dow: r.dow || "",
+        in: r.in_t || "",
+        out: r.out_t || "",
+        dur: Number(r.dur || 0),
+      }))
+      setDetailCache((c) => ({ ...c, [name]: mapped }))
+    } catch (e) {
+      console.error("Failed to fetch visit detail:", e)
+      setDetailCache((c) => ({ ...c, [name]: [] }))
+    } finally {
+      setLoadingName(null)
+    }
+  }
 
   const months = useMemo(
     () => Array.from(new Set(records.map((r) => r.mon))).sort(),
@@ -128,8 +149,19 @@ export function TimelineExplorer({
     return full.slice(lo, hi + 1)
   }, [curName, records, buckets])
 
-  const visits = useMemo(() => (curName ? detail[curName] ?? [] : []), [curName, detail])
-  const totalMin = visits.reduce((s, v) => s + v.dur, 0)
+  const visits = useMemo(() => (curName ? detailCache[curName] ?? [] : []), [curName, detailCache])
+  const isLoadingDetail = loadingName === curName
+  // サマリはランキング集計(records)から即時に算出（明細取得を待たない）
+  const placeStats = useMemo(() => {
+    if (!curName) return { visits: 0, hours: 0 }
+    let v = 0
+    let h = 0
+    for (const r of records) if (r.place_name === curName) {
+      v += r.visits
+      h += r.hours
+    }
+    return { visits: v, hours: h }
+  }, [curName, records])
   const sortedVisits = useMemo(() => {
     return [...visits].sort((a, b) => {
       const A = a[sortKey]
@@ -198,7 +230,7 @@ export function TimelineExplorer({
                 return (
                   <div
                     key={it.name}
-                    onClick={() => setCurName(it.name)}
+                    onClick={() => selectPlace(it.name)}
                     className={cn(
                       "flex items-center gap-2 rounded-md px-1.5 py-1 cursor-pointer hover:bg-muted",
                       selected && "bg-muted outline outline-1 outline-primary"
@@ -266,15 +298,15 @@ export function TimelineExplorer({
 
                 <div className="my-3 flex gap-6 text-sm text-muted-foreground">
                   <div>
-                    訪問回数 <b className="text-foreground text-lg tabular-nums">{visits.length}</b> 回
+                    訪問回数 <b className="text-foreground text-lg tabular-nums">{placeStats.visits}</b> 回
                   </div>
                   <div>
-                    合計滞在 <b className="text-foreground text-lg tabular-nums">{(totalMin / 60).toFixed(1)}</b> h
+                    合計滞在 <b className="text-foreground text-lg tabular-nums">{placeStats.hours.toFixed(1)}</b> h
                   </div>
                   <div>
                     平均{" "}
                     <b className="text-foreground text-lg tabular-nums">
-                      {visits.length ? Math.round(totalMin / visits.length) : 0}
+                      {placeStats.visits ? Math.round((placeStats.hours * 60) / placeStats.visits) : 0}
                     </b>{" "}
                     分/回
                   </div>
@@ -316,15 +348,27 @@ export function TimelineExplorer({
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedVisits.map((v, i) => (
-                        <tr key={i} className="border-t">
-                          <td className="px-2 py-1">{v.date}</td>
-                          <td className={cn("px-2 py-1", WEEKEND.has(v.dow) && "text-amber-500")}>{v.dow}</td>
-                          <td className="px-2 py-1">{v.in}</td>
-                          <td className="px-2 py-1">{v.out}</td>
-                          <td className="px-2 py-1">{v.dur}</td>
+                      {isLoadingDetail ? (
+                        <tr>
+                          <td colSpan={5} className="px-2 py-6 text-center text-muted-foreground">
+                            <Loader2 className="inline h-4 w-4 animate-spin mr-1" /> 読み込み中…
+                          </td>
                         </tr>
-                      ))}
+                      ) : sortedVisits.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-2 py-6 text-center text-muted-foreground">明細データなし</td>
+                        </tr>
+                      ) : (
+                        sortedVisits.map((v, i) => (
+                          <tr key={i} className="border-t">
+                            <td className="px-2 py-1">{v.date}</td>
+                            <td className={cn("px-2 py-1", WEEKEND.has(v.dow) && "text-amber-500")}>{v.dow}</td>
+                            <td className="px-2 py-1">{v.in}</td>
+                            <td className="px-2 py-1">{v.out}</td>
+                            <td className="px-2 py-1">{v.dur}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
