@@ -10,14 +10,89 @@ variable "project_name" {
   default = "sekisyo"
 }
 
-variable "data_bucket_arn" {
-  description = "Sekisyoデータが格納されているS3バケットのARN"
-  default     = "arn:aws:s3:::fitbit-dashboard"
+variable "data_bucket_name" {
+  description = "Sekisyo の生データ（Fitbit/位置情報/家計簿）が格納されている S3 バケット名"
+  default     = "fitbit-dashboard"
 }
+
+# 生データバケット（既存・import で Terraform 管理下に取り込む）
+resource "aws_s3_bucket" "data_bucket" {
+  bucket = var.data_bucket_name
+}
+
+import {
+  to = aws_s3_bucket.data_bucket
+  id = var.data_bucket_name
+}
+
+# 公開を全面ブロック（最も機密度の高い生データのため最優先）
+resource "aws_s3_bucket_public_access_block" "data_bucket" {
+  bucket                  = aws_s3_bucket.data_bucket.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# デフォルト暗号化（SSE-S3）
+resource "aws_s3_bucket_server_side_encryption_configuration" "data_bucket" {
+  bucket = aws_s3_bucket.data_bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# 注意: 生データは唯一の正本のため、results バケットのような expiration
+# ライフサイクル（自動削除）は意図的に付与しない。
 
 # Athena クエリ結果保存用バケット
 resource "aws_s3_bucket" "athena_results" {
   bucket = "${var.project_name}-athena-results"
+}
+
+# 公開を全面ブロック（機密データのクエリ結果が入るため必須）
+resource "aws_s3_bucket_public_access_block" "athena_results" {
+  bucket                  = aws_s3_bucket.athena_results.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# デフォルト暗号化（SSE-S3）
+resource "aws_s3_bucket_server_side_encryption_configuration" "athena_results" {
+  bucket = aws_s3_bucket.athena_results.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# クエリ結果（＝機密データのコピー）は 30 日で自動削除し、無期限の蓄積を防ぐ
+resource "aws_s3_bucket_lifecycle_configuration" "athena_results" {
+  bucket = aws_s3_bucket.athena_results.id
+
+  rule {
+    id     = "expire-query-results"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
 }
 
 # Athena ワークグループ
@@ -30,6 +105,10 @@ resource "aws_athena_workgroup" "main" {
 
     result_configuration {
       output_location = "s3://${aws_s3_bucket.athena_results.bucket}/"
+
+      encryption_configuration {
+        encryption_option = "SSE_S3"
+      }
     }
   }
 }
@@ -85,8 +164,8 @@ resource "aws_iam_user_policy" "app_policy" {
         ]
         Effect = "Allow"
         Resource = [
-          var.data_bucket_arn,
-          "${var.data_bucket_arn}/*"
+          aws_s3_bucket.data_bucket.arn,
+          "${aws_s3_bucket.data_bucket.arn}/*"
         ]
       },
       {
