@@ -36,6 +36,11 @@ const SPEEDS: { key: string; ms: number }[] = [
   { key: "2x", ms: 550 },
 ]
 
+// ローリング集計の窓幅（各フレームで「直近この数のバケット」を合計）。
+// 刻み自体は粒度のまま（バケット数は増えない）。中身だけ直近合計になる
+const ROLL_WINDOW: Record<Unit, number> = { month: 12, quarter: 4, year: 3 }
+const WINDOW_NOTE: Record<Unit, string> = { month: "直近12ヶ月", quarter: "直近4四半期", year: "直近3年" }
+
 export function TimelineView({ records }: { records: RankRow[] }) {
   const [tab, setTab] = useState<"ranking" | "map">("ranking")
   const [unit, setUnit] = useState<Unit>("month")
@@ -52,6 +57,15 @@ export function TimelineView({ records }: { records: RankRow[] }) {
   const buckets = useMemo(() => buildBuckets(months, unit), [months, unit])
   const safePos = Math.max(0, Math.min(pos, buckets.length - 1))
   const current = buckets[safePos]
+
+  // ローリング窓の下端（safePos を末尾に直近 windowSize 個。先頭付近は有る分だけ）
+  const windowSize = ROLL_WINDOW[unit]
+  const winLo = Math.max(0, safePos - windowSize + 1)
+  const windowLabel =
+    winLo === safePos
+      ? current?.label ?? "-"
+      : `${buckets[winLo]?.label ?? ""} 〜 ${current?.label ?? ""}`
+  const windowNote = winLo === 0 ? "期間開始〜現在の合計" : `${WINDOW_NOTE[unit]}の合計`
 
   const speedMs = SPEEDS.find((s) => s.key === speedKey)?.ms ?? 1100
   // 並べ替えアニメは 1 期間の間隔より少し短くして、次の遷移前に収束させる
@@ -96,11 +110,14 @@ export function TimelineView({ records }: { records: RankRow[] }) {
     setPos(next.length - 1)
   }
 
-  // 選択中の区切りの場所集約（指標で降順）。集計・明細と揃えて place_id で集約し、
-  // 表示名/URI は期間内の最新月の値を代表として採用（records は mon 昇順）
+  // 場所の集約（指標で降順）。直近 windowSize バケットぶんの月をまとめて合計する
+  // ローリング集計。place_id で集約し、表示名/URI は最新月の値を代表採用（records は mon 昇順）
   const items = useMemo<PlaceItem[]>(() => {
-    if (!current) return []
-    const set = new Set(current.months)
+    if (!buckets.length) return []
+    const set = new Set<string>()
+    for (let i = winLo; i <= safePos; i++) {
+      for (const m of buckets[i]?.months ?? []) set.add(m)
+    }
     const agg = new Map<string, PlaceItem>()
     for (const r of records) {
       if (!set.has(r.mon)) continue
@@ -126,7 +143,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
     return Array.from(agg.values()).sort((x, y) =>
       metric === "hours" ? y.hours - x.hours : y.visits - x.visits
     )
-  }, [records, current, metric])
+  }, [records, buckets, winLo, safePos, metric])
 
   // 選択中の場所（place_id 一致）。期間切替で対象が消えたら null 扱い
   const cur = useMemo(() => items.find((i) => i.placeId === selectedId), [items, selectedId])
@@ -134,7 +151,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 flex-wrap">
-        <CardTitle className="text-xl font-bold tabular-nums">{current?.label ?? "-"}</CardTitle>
+        <CardTitle className="text-xl font-bold tabular-nums">{windowLabel}</CardTitle>
         <div className="flex gap-2">
           <Toggle options={UNIT_OPTIONS} value={unit} onChange={changeUnit} />
           <Toggle options={METRIC_OPTIONS} value={metric} onChange={setMetric} />
@@ -192,7 +209,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
           <Toggle options={SPEEDS.map((s) => ({ key: s.key, label: s.key }))} value={speedKey} onChange={setSpeedKey} />
         </div>
         <p className="mt-2 text-xs text-muted-foreground tabular-nums">
-          全{buckets.length}期間中 {safePos + 1}番目
+          全{buckets.length}期間中 {safePos + 1}番目・{windowNote}
         </p>
 
         <Tabs
