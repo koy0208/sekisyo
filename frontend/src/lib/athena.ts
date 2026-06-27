@@ -34,28 +34,37 @@ export const runAthenaQuery = async (query: string, database?: string): Promise<
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
-  const resultsCommand = new GetQueryResultsCommand({ QueryExecutionId });
-  const results = await client.send(resultsCommand);
-  return parseAthenaResults(results);
-};
+  // GetQueryResults は 1 ページ最大 1000 行。NextToken で全ページ取得する
+  // (ページング未対応だと先頭 1000 行で打ち切られる)。
+  const allRows: AthenaRow[] = [];
+  let columns: string[] = [];
+  let nextToken: string | undefined = undefined;
+  let isFirstPage = true;
 
-const parseAthenaResults = (results: GetQueryResultsCommandOutput): AthenaRow[] => {
-  const columnInfo = results.ResultSet?.ResultSetMetadata?.ColumnInfo;
-  const rows = results.ResultSet?.Rows;
+  do {
+    const resultsCommand = new GetQueryResultsCommand({ QueryExecutionId, NextToken: nextToken });
+    const results: GetQueryResultsCommandOutput = await client.send(resultsCommand);
 
-  if (!columnInfo || !rows) return [];
+    const columnInfo = results.ResultSet?.ResultSetMetadata?.ColumnInfo;
+    if (columns.length === 0 && columnInfo) {
+      columns = columnInfo.map((col) => col.Name || "");
+    }
 
-  const columns = columnInfo.map((col) => col.Name || "");
-  
-  // The first row is the header, so we skip it
-  return rows.slice(1).map((row) => {
-    const data: AthenaRow = {};
-    row.Data?.forEach((val, i) => {
-      const columnName = columns[i];
-      if (columnName) {
-        data[columnName] = val.VarCharValue;
-      }
-    });
-    return data;
-  });
+    const rows = results.ResultSet?.Rows ?? [];
+    // ヘッダ行は最初のページの先頭のみに含まれる
+    const dataRows = isFirstPage ? rows.slice(1) : rows;
+    for (const row of dataRows) {
+      const data: AthenaRow = {};
+      row.Data?.forEach((val, i) => {
+        const columnName = columns[i];
+        if (columnName) data[columnName] = val.VarCharValue;
+      });
+      allRows.push(data);
+    }
+
+    nextToken = results.NextToken;
+    isFirstPage = false;
+  } while (nextToken);
+
+  return allRows;
 };
