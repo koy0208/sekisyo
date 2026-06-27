@@ -17,8 +17,11 @@ export async function getTimelineRanking() {
   const query = `
     SELECT
       substr(date, 1, 7) AS mon,
+      place_id,
       max(place_name) AS place_name,
       max(google_maps_uri) AS uri,
+      max(lat) AS lat,
+      max(lng) AS lng,
       count(*) AS visits,
       round(sum(duration_min) / 60.0, 1) AS hours
     FROM visits

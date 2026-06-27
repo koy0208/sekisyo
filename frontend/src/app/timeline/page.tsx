@@ -1,4 +1,5 @@
-import { TimelineExplorer, type RankRow } from "@/components/timeline/timeline-explorer"
+import { TimelineView } from "@/components/timeline/timeline-view"
+import { type RankRow } from "@/components/timeline/timeline-shared"
 import { getTimelineRanking } from "@/app/actions/timeline-actions"
 import { AthenaRow } from "@/lib/athena"
 
@@ -12,8 +13,11 @@ export default async function TimelinePage() {
     const rawRanking = await getTimelineRanking()
     records = rawRanking.map((row: AthenaRow) => ({
       mon: row.mon || '',
+      placeId: row.place_id || '',
       place_name: row.place_name || '不明',
       uri: row.uri || undefined,
+      lat: row.lat != null ? Number(row.lat) : null,
+      lng: row.lng != null ? Number(row.lng) : null,
       visits: Number(row.visits || 0),
       hours: Number(row.hours || 0),
     }))
@@ -28,7 +32,7 @@ export default async function TimelinePage() {
         <p className="text-sm text-muted-foreground">
           外出先の滞在を集計したランキング（自宅除外）。期間の単位を切替え、場所をクリックで訪問の詳細を表示。
         </p>
-        <TimelineExplorer records={records} />
+        <TimelineView records={records} />
       </div>
     </div>
   )
