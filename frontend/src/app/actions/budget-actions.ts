@@ -4,6 +4,32 @@ import { runAthenaQuery } from "@/lib/athena";
 
 const BUDGET_DB = 'sekisyo'
 
+// Server Action は実体が公開 POST エンドポイントで、引数の TS 型は実行時に
+// 強制されない。SQL に直接埋め込む値はここで必ず検証する（SQL インジェクション対策）。
+function assertYearMonth(yearMonth: string): string {
+  if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
+    throw new Error(`Invalid yearMonth: ${yearMonth}`)
+  }
+  return yearMonth
+}
+
+// interval の単位は固定の allowlist のみ許可する
+const ALLOWED_UNITS = new Set(['day', 'week', 'month', 'year'])
+function assertUnit(unit: string): string {
+  if (!ALLOWED_UNITS.has(unit)) {
+    throw new Error(`Invalid unit: ${unit}`)
+  }
+  return unit
+}
+
+// interval の数量は正の整数のみ許可する
+function assertAmount(amount: number): number {
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new Error(`Invalid amount: ${amount}`)
+  }
+  return amount
+}
+
 function prevMonth(yearMonth: string): string {
   const [y, m] = yearMonth.split('-').map(Number)
   const d = new Date(y, m - 2, 1) // month is 0-indexed, so m-2 gives previous month
@@ -11,6 +37,7 @@ function prevMonth(yearMonth: string): string {
 }
 
 export async function getDailyCumulativeSpending(yearMonth: string) {
+  assertYearMonth(yearMonth)
   const prev = prevMonth(yearMonth)
   const query = `
     WITH daily AS (
@@ -39,6 +66,7 @@ export async function getDailyCumulativeSpending(yearMonth: string) {
 }
 
 export async function getCategoryBreakdown(yearMonth: string) {
+  assertYearMonth(yearMonth)
   const query = `
     SELECT
       major_category,
@@ -55,6 +83,7 @@ export async function getCategoryBreakdown(yearMonth: string) {
 }
 
 export async function getMonthSummary(yearMonth: string) {
+  assertYearMonth(yearMonth)
   const query = `
     SELECT
       SUM(CAST(amount AS INTEGER)) as total_amount,
@@ -70,6 +99,7 @@ export async function getMonthSummary(yearMonth: string) {
 }
 
 export async function getDailyCategorySpending(yearMonth: string) {
+  assertYearMonth(yearMonth)
   const prev = prevMonth(yearMonth)
   const query = `
     SELECT
@@ -93,13 +123,15 @@ export async function getDailyCategorySpending(yearMonth: string) {
 
 export async function getDailySpendingByPeriod(amount?: number, unit?: string) {
   const isAll = amount === undefined || unit === undefined
-  const isMonthly = isAll || unit === 'year'
+  const safeAmount = isAll ? 0 : assertAmount(amount!)
+  const safeUnit = isAll ? '' : assertUnit(unit!)
+  const isMonthly = isAll || safeUnit === 'year'
   const dateKey = isMonthly
     ? "date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m')"
     : "date_format(date_trunc('week', date_parse(date, '%Y/%m/%d')), '%Y-%m-%d')"
   const whereClause = isAll
     ? ''
-    : `AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d') >= date_format(current_date - interval '${amount}' ${unit}, '%Y-%m-%d')`
+    : `AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d') >= date_format(current_date - interval '${safeAmount}' ${safeUnit}, '%Y-%m-%d')`
   const query = `
     SELECT
       ${dateKey} as date_key,
@@ -118,13 +150,15 @@ export async function getDailySpendingByPeriod(amount?: number, unit?: string) {
 
 export async function getDailyIncomeByPeriod(amount?: number, unit?: string) {
   const isAll = amount === undefined || unit === undefined
-  const isMonthly = isAll || unit === 'year'
+  const safeAmount = isAll ? 0 : assertAmount(amount!)
+  const safeUnit = isAll ? '' : assertUnit(unit!)
+  const isMonthly = isAll || safeUnit === 'year'
   const dateKey = isMonthly
     ? "date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m')"
     : "date_format(date_trunc('week', date_parse(date, '%Y/%m/%d')), '%Y-%m-%d')"
   const whereClause = isAll
     ? ''
-    : `AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d') >= date_format(current_date - interval '${amount}' ${unit}, '%Y-%m-%d')`
+    : `AND date_format(date_parse(date, '%Y/%m/%d'), '%Y-%m-%d') >= date_format(current_date - interval '${safeAmount}' ${safeUnit}, '%Y-%m-%d')`
   const query = `
     SELECT
       ${dateKey} as date_key,
@@ -142,6 +176,7 @@ export async function getDailyIncomeByPeriod(amount?: number, unit?: string) {
 }
 
 export async function getMonthComparison(yearMonth: string) {
+  assertYearMonth(yearMonth)
   const prev = prevMonth(yearMonth)
   const query = `
     SELECT
