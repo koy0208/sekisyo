@@ -53,3 +53,5 @@ next-env.d.ts
 *.tfplan
 .terraform.tfstate.lock.info
 *.hcl
+# coverage / profiling artifacts
+*.profraw
