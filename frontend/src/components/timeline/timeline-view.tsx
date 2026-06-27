@@ -34,7 +34,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
   const [unit, setUnit] = useState<Unit>("month")
   const [metric, setMetric] = useState<Metric>("hours")
   const [pos, setPos] = useState<number>(Number.MAX_SAFE_INTEGER)
-  const [placeName, setPlaceName] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const months = useMemo(
     () => Array.from(new Set(records.map((r) => r.mon))).sort(),
@@ -50,7 +50,8 @@ export function TimelineView({ records }: { records: RankRow[] }) {
     setPos(next.length - 1)
   }
 
-  // 選択中の区切りの場所集約（指標で降順）。マップ用に lat/lng/uri/placeId を保持
+  // 選択中の区切りの場所集約（指標で降順）。集計・明細と揃えて place_id で集約し、
+  // 表示名/URI は期間内の最新月の値を代表として採用（records は mon 昇順）
   const items = useMemo<PlaceItem[]>(() => {
     if (!current) return []
     const set = new Set(current.months)
@@ -58,7 +59,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
     for (const r of records) {
       if (!set.has(r.mon)) continue
       const a =
-        agg.get(r.place_name) ??
+        agg.get(r.placeId) ??
         ({
           name: r.place_name,
           placeId: r.placeId,
@@ -70,14 +71,19 @@ export function TimelineView({ records }: { records: RankRow[] }) {
         } as PlaceItem)
       a.visits += r.visits
       a.hours += r.hours
+      if (r.place_name) a.name = r.place_name
+      if (r.uri) a.uri = r.uri
       if (a.lat == null && r.lat != null) a.lat = r.lat
       if (a.lng == null && r.lng != null) a.lng = r.lng
-      agg.set(r.place_name, a)
+      agg.set(r.placeId, a)
     }
     return Array.from(agg.values()).sort((x, y) =>
       metric === "hours" ? y.hours - x.hours : y.visits - x.visits
     )
   }, [records, current, metric])
+
+  // 選択中の場所（place_id 一致）。期間切替で対象が消えたら null 扱い
+  const cur = useMemo(() => items.find((i) => i.placeId === selectedId), [items, selectedId])
 
   return (
     <Card>
@@ -149,8 +155,8 @@ export function TimelineView({ records }: { records: RankRow[] }) {
               safePos={safePos}
               unit={unit}
               metric={metric}
-              curName={placeName}
-              onSelect={setPlaceName}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
             />
           </TabsContent>
 
@@ -160,24 +166,25 @@ export function TimelineView({ records }: { records: RankRow[] }) {
                 <TimelineMap
                   items={items}
                   metric={metric}
-                  selectedName={placeName}
-                  onSelect={setPlaceName}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
                 />
               </div>
               <div className="min-w-0 lg:w-[420px] lg:shrink-0 lg:border-l lg:pl-6">
-                {!placeName ? (
+                {!cur ? (
                   <div className="py-16 text-center text-sm text-muted-foreground">
                     ピンをクリックすると、ここに詳細が表示されます
                   </div>
                 ) : (
                   <PlaceDetail
-                    name={placeName}
+                    placeId={cur.placeId}
+                    name={cur.name}
                     records={records}
                     buckets={buckets}
                     safePos={safePos}
                     unit={unit}
                     metric={metric}
-                    onClose={() => setPlaceName(null)}
+                    onClose={() => setSelectedId(null)}
                   />
                 )}
               </div>

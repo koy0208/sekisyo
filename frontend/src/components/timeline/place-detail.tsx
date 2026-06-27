@@ -19,6 +19,7 @@ import {
 type SortKey = keyof VisitRow
 
 export function PlaceDetail({
+  placeId,
   name,
   records,
   buckets,
@@ -27,6 +28,7 @@ export function PlaceDetail({
   metric,
   onClose,
 }: {
+  placeId: string
   name: string
   records: RankRow[]
   buckets: Bucket[]
@@ -38,26 +40,26 @@ export function PlaceDetail({
   const [sortKey, setSortKey] = useState<SortKey>("date")
   const [sortDir, setSortDir] = useState<number>(-1)
 
-  const { visits, loading: isLoadingDetail } = usePlaceVisits(name)
+  const { visits, loading: isLoadingDetail } = usePlaceVisits(placeId)
 
   const metricLabel = metric === "hours" ? "滞在時間(h)" : "回数"
-  const curUri = useMemo(() => records.find((r) => r.place_name === name)?.uri, [records, name])
+  const curUri = useMemo(() => records.find((r) => r.placeId === placeId)?.uri, [records, placeId])
 
   // サマリはランキング集計(records)から即時に算出（明細取得を待たない）
   const placeStats = useMemo(() => {
     let v = 0
     let h = 0
-    for (const r of records) if (r.place_name === name) {
+    for (const r of records) if (r.placeId === placeId) {
       v += r.visits
       h += r.hours
     }
     return { visits: v, hours: h }
-  }, [name, records])
+  }, [placeId, records])
 
   // 区切りごとの推移（X=粒度, Y=指標）。X軸は初訪問〜最終訪問にトリム
   const series = useMemo(() => {
     const byMon = new Map<string, RankRow>()
-    for (const r of records) if (r.place_name === name) byMon.set(r.mon, r)
+    for (const r of records) if (r.placeId === placeId) byMon.set(r.mon, r)
     const full = buckets.map((b, i) => {
       let hours = 0
       let visits = 0
@@ -75,7 +77,7 @@ export function PlaceDetail({
     let hi = full.length - 1
     while (hi >= 0 && full[hi].visits === 0) hi--
     return full.slice(lo, hi + 1)
-  }, [name, records, buckets])
+  }, [placeId, records, buckets])
 
   const sortedVisits = useMemo(() => {
     return [...visits].sort((a, b) => {

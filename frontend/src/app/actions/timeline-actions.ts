@@ -32,10 +32,12 @@ export async function getTimelineRanking() {
   return await runAthenaQuery(query, TIMELINE_DB)
 }
 
-// 1 場所の訪問明細（ドリルダウンのテーブル用）。クリック時に都度取得する
-export async function getTimelinePlaceVisits(placeName: string) {
+// 1 場所の訪問明細（ドリルダウンのテーブル用）。クリック時に都度取得する。
+// 集計（getTimelineRanking）が place_id 単位なので、明細も place_id で揃える
+// （place_name は表記揺れ・名称変更で 1 場所に複数あり得るため一致条件に使わない）
+export async function getTimelinePlaceVisits(placeId: string) {
   // 自前データだが念のためシングルクオートをエスケープ
-  const safe = placeName.replace(/'/g, "''")
+  const safe = placeId.replace(/'/g, "''")
   const query = `
     SELECT
       date,
@@ -45,7 +47,7 @@ export async function getTimelinePlaceVisits(placeName: string) {
       duration_min AS dur
     FROM visits
     WHERE ${VISIT_FILTER}
-      AND place_name = '${safe}'
+      AND place_id = '${safe}'
     ORDER BY start_time
   `
   return await runAthenaQuery(query, TIMELINE_DB)

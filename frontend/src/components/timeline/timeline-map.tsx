@@ -49,13 +49,13 @@ function FitBounds({ points }: { points: MapPoint[] }) {
 export default function TimelineMap({
   items,
   metric,
-  selectedName,
+  selectedId,
   onSelect,
 }: {
   items: PlaceItem[]
   metric: Metric
-  selectedName: string | null
-  onSelect: (name: string) => void
+  selectedId: string | null
+  onSelect: (placeId: string) => void
 }) {
   const points = useMemo(
     () => items.filter((i): i is MapPoint => i.lat != null && i.lng != null),
@@ -81,14 +81,14 @@ export default function TimelineMap({
       {points.map((p) => {
         const v = metric === 'hours' ? p.hours : p.visits
         const radius = 6 + (v / maxVal) * 18
-        const selected = p.name === selectedName
+        const selected = p.placeId === selectedId
         return (
           <Marker
             key={p.placeId || p.name}
             position={[p.lat, p.lng]}
             icon={makeIcon(radius, selected)}
             zIndexOffset={selected ? 1000 : 0}
-            eventHandlers={{ click: () => onSelect(p.name) }}
+            eventHandlers={{ click: () => onSelect(p.placeId) }}
           >
             <Popup>
               <div className="text-xs">

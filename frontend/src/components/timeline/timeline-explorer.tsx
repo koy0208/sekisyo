@@ -21,7 +21,7 @@ export function TimelineExplorer({
   safePos,
   unit,
   metric,
-  curName,
+  selectedId,
   onSelect,
 }: {
   items: PlaceItem[]
@@ -30,10 +30,11 @@ export function TimelineExplorer({
   safePos: number
   unit: Unit
   metric: Metric
-  curName: string | null
-  onSelect: (name: string | null) => void
+  selectedId: string | null
+  onSelect: (placeId: string | null) => void
 }) {
   const maxVal = Math.max(...items.map((i) => (metric === "hours" ? i.hours : i.visits)), 1)
+  const cur = items.find((i) => i.placeId === selectedId)
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -43,11 +44,11 @@ export function TimelineExplorer({
           {items.map((it, i) => {
             const v = metric === "hours" ? it.hours : it.visits
             const w = (v / maxVal) * 100
-            const selected = it.name === curName
+            const selected = it.placeId === selectedId
             return (
               <div
-                key={it.name}
-                onClick={() => onSelect(it.name)}
+                key={it.placeId}
+                onClick={() => onSelect(it.placeId)}
                 className={cn(
                   "flex items-center gap-2 rounded-md px-1.5 py-1 cursor-pointer hover:bg-muted",
                   selected && "bg-muted outline outline-1 outline-primary"
@@ -90,13 +91,14 @@ export function TimelineExplorer({
 
       {/* 右: ドリルダウン */}
       <div className="lg:w-1/2 min-w-0 lg:border-l lg:pl-6">
-        {!curName ? (
+        {!cur ? (
           <div className="py-16 text-center text-sm text-muted-foreground">
             ← ランキングの行をクリックすると、ここに詳細が表示されます
           </div>
         ) : (
           <PlaceDetail
-            name={curName}
+            placeId={cur.placeId}
+            name={cur.name}
             records={records}
             buckets={buckets}
             safePos={safePos}

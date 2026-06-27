@@ -78,18 +78,18 @@ export const chartConfig = {
 } satisfies ChartConfig
 
 // 訪問明細のモジュールレベルキャッシュ。ランキング/マップ両タブで共有し、
-// 同じ場所を両タブで開いても再取得しない。
+// 同じ場所を両タブで開いても再取得しない。キーは place_id（集計と同じ単位）。
 const visitsCache = new Map<string, VisitRow[]>()
 
-export function usePlaceVisits(name: string | null): { visits: VisitRow[]; loading: boolean } {
+export function usePlaceVisits(placeId: string | null): { visits: VisitRow[]; loading: boolean } {
   const [, force] = useState(0)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!name || visitsCache.has(name)) return
+    if (!placeId || visitsCache.has(placeId)) return
     let active = true
     setLoading(true)
-    getTimelinePlaceVisits(name)
+    getTimelinePlaceVisits(placeId)
       .then((rows) => {
         const mapped: VisitRow[] = (rows as AthenaRow[]).map((r) => ({
           date: r.date || "",
@@ -98,11 +98,11 @@ export function usePlaceVisits(name: string | null): { visits: VisitRow[]; loadi
           out: r.out_t || "",
           dur: Number(r.dur || 0),
         }))
-        visitsCache.set(name, mapped)
+        visitsCache.set(placeId, mapped)
       })
       .catch((e) => {
         console.error("Failed to fetch visit detail:", e)
-        visitsCache.set(name, [])
+        visitsCache.set(placeId, [])
       })
       .finally(() => {
         if (active) {
@@ -113,10 +113,10 @@ export function usePlaceVisits(name: string | null): { visits: VisitRow[]; loadi
     return () => {
       active = false
     }
-  }, [name])
+  }, [placeId])
 
-  const visits = name ? visitsCache.get(name) ?? [] : []
-  const loadingNow = !!name && !visitsCache.has(name) && loading
+  const visits = placeId ? visitsCache.get(placeId) ?? [] : []
+  const loadingNow = !!placeId && !visitsCache.has(placeId) && loading
   return { visits, loading: loadingNow }
 }
 
