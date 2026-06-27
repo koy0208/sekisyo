@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import dynamic from "next/dynamic"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { ChevronLeft, ChevronRight, ChevronDown, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronDown, Loader2, Play, Pause } from "lucide-react"
 import { TimelineExplorer } from "@/components/timeline/timeline-explorer"
 import { PlaceDetail } from "@/components/timeline/place-detail"
 import {
@@ -29,12 +29,21 @@ const TimelineMap = dynamic(() => import("@/components/timeline/timeline-map"), 
   ),
 })
 
+// レース再生の速度（1 期間あたりのミリ秒）。1x を基準に前後
+const SPEEDS: { key: string; ms: number }[] = [
+  { key: "0.5x", ms: 2000 },
+  { key: "1x", ms: 1100 },
+  { key: "2x", ms: 550 },
+]
+
 export function TimelineView({ records }: { records: RankRow[] }) {
   const [tab, setTab] = useState<"ranking" | "map">("ranking")
   const [unit, setUnit] = useState<Unit>("month")
   const [metric, setMetric] = useState<Metric>("hours")
   const [pos, setPos] = useState<number>(Number.MAX_SAFE_INTEGER)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const [speedKey, setSpeedKey] = useState("1x")
 
   const months = useMemo(
     () => Array.from(new Set(records.map((r) => r.mon))).sort(),
@@ -44,8 +53,45 @@ export function TimelineView({ records }: { records: RankRow[] }) {
   const safePos = Math.max(0, Math.min(pos, buckets.length - 1))
   const current = buckets[safePos]
 
+  const speedMs = SPEEDS.find((s) => s.key === speedKey)?.ms ?? 1100
+  // 並べ替えアニメは 1 期間の間隔より少し短くして、次の遷移前に収束させる
+  const transitionSec = Math.min(0.8, (speedMs / 1000) * 0.75)
+
+  // 再生中は一定間隔で期間を進める。末尾に達したら自動停止
+  useEffect(() => {
+    if (!playing) return
+    const id = setInterval(() => {
+      setPos((p) => {
+        const cur = Math.max(0, Math.min(p, buckets.length - 1))
+        if (cur >= buckets.length - 1) {
+          setPlaying(false)
+          return cur
+        }
+        return cur + 1
+      })
+    }, speedMs)
+    return () => clearInterval(id)
+  }, [playing, speedMs, buckets.length])
+
+  function togglePlay() {
+    if (playing) {
+      setPlaying(false)
+      return
+    }
+    // 末尾にいるときは先頭から再生し直す
+    if (safePos >= buckets.length - 1) setPos(0)
+    setPlaying(true)
+  }
+
+  // 手動で期間を動かしたら再生を止める（ユーザー操作を優先）
+  function gotoPos(p: number) {
+    setPlaying(false)
+    setPos(p)
+  }
+
   function changeUnit(u: Unit) {
     const next = buildBuckets(months, u)
+    setPlaying(false)
     setUnit(u)
     setPos(next.length - 1)
   }
@@ -100,7 +146,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
           <button
             className="h-9 w-9 rounded-md border bg-muted disabled:opacity-30"
             disabled={safePos <= 0}
-            onClick={() => setPos(safePos - 1)}
+            onClick={() => gotoPos(safePos - 1)}
             aria-label="前の期間"
           >
             <ChevronLeft className="h-4 w-4 mx-auto" />
@@ -108,7 +154,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
           <div className="relative flex-1 min-w-[180px]">
             <select
               value={safePos}
-              onChange={(e) => setPos(Number(e.target.value))}
+              onChange={(e) => gotoPos(Number(e.target.value))}
               aria-label="期間を選択"
               className="w-full h-9 appearance-none rounded-md border bg-background pl-3 pr-9 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
             >
@@ -127,11 +173,23 @@ export function TimelineView({ records }: { records: RankRow[] }) {
           <button
             className="h-9 w-9 rounded-md border bg-muted disabled:opacity-30"
             disabled={safePos >= buckets.length - 1}
-            onClick={() => setPos(safePos + 1)}
+            onClick={() => gotoPos(safePos + 1)}
             aria-label="次の期間"
           >
             <ChevronRight className="h-4 w-4 mx-auto" />
           </button>
+
+          {/* レース再生コントロール */}
+          <button
+            className="flex h-9 items-center gap-1.5 rounded-md border bg-primary px-3 text-sm text-primary-foreground disabled:opacity-30"
+            disabled={buckets.length <= 1}
+            onClick={togglePlay}
+            aria-label={playing ? "一時停止" : "再生"}
+          >
+            {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {playing ? "停止" : "再生"}
+          </button>
+          <Toggle options={SPEEDS.map((s) => ({ key: s.key, label: s.key }))} value={speedKey} onChange={setSpeedKey} />
         </div>
         <p className="mt-2 text-xs text-muted-foreground tabular-nums">
           全{buckets.length}期間中 {safePos + 1}番目
@@ -157,6 +215,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
               metric={metric}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              transitionSec={transitionSec}
             />
           </TabsContent>
 
