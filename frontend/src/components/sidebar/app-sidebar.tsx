@@ -2,12 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Activity, Wallet } from "lucide-react"
+import { Activity, Wallet, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
   { href: "/activity", label: "Activity", icon: Activity },
   { href: "/budget", label: "Budget", icon: Wallet },
+  { href: "/timeline", label: "Timeline", icon: MapPin },
 ]
 
 export function AppSidebar() {
