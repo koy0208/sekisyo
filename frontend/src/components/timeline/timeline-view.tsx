@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import dynamic from "next/dynamic"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronDown, Loader2 } from "lucide-react"
 import { TimelineExplorer } from "@/components/timeline/timeline-explorer"
 import { PlaceDetail } from "@/components/timeline/place-detail"
 import {
@@ -89,26 +89,37 @@ export function TimelineView({ records }: { records: RankRow[] }) {
         </div>
       </CardHeader>
       <CardContent>
-        {/* 期間ナビ（両タブ共有） */}
-        <div className="flex items-center gap-3">
+        {/* 期間ナビ（両タブ共有）: 矢印で前後、ドロップダウンで任意の期間へジャンプ */}
+        <div className="flex flex-wrap items-center gap-3">
           <button
-            className="h-8 w-8 rounded-md border bg-muted disabled:opacity-30"
+            className="h-9 w-9 rounded-md border bg-muted disabled:opacity-30"
             disabled={safePos <= 0}
             onClick={() => setPos(safePos - 1)}
             aria-label="前の期間"
           >
             <ChevronLeft className="h-4 w-4 mx-auto" />
           </button>
-          <input
-            type="range"
-            min={0}
-            max={Math.max(0, buckets.length - 1)}
-            value={safePos}
-            onChange={(e) => setPos(Number(e.target.value))}
-            className="flex-1 accent-primary"
-          />
+          <div className="relative flex-1 min-w-[180px]">
+            <select
+              value={safePos}
+              onChange={(e) => setPos(Number(e.target.value))}
+              aria-label="期間を選択"
+              className="w-full h-9 appearance-none rounded-md border bg-background pl-3 pr-9 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              {/* 最新の期間を上に表示（value は時系列の位置インデックス） */}
+              {buckets
+                .map((b, i) => ({ idx: i, label: b.label }))
+                .reverse()
+                .map((o) => (
+                  <option key={o.idx} value={o.idx}>
+                    {o.label}
+                  </option>
+                ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
           <button
-            className="h-8 w-8 rounded-md border bg-muted disabled:opacity-30"
+            className="h-9 w-9 rounded-md border bg-muted disabled:opacity-30"
             disabled={safePos >= buckets.length - 1}
             onClick={() => setPos(safePos + 1)}
             aria-label="次の期間"
@@ -116,6 +127,9 @@ export function TimelineView({ records }: { records: RankRow[] }) {
             <ChevronRight className="h-4 w-4 mx-auto" />
           </button>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground tabular-nums">
+          全{buckets.length}期間中 {safePos + 1}番目
+        </p>
 
         <Tabs
           value={tab}
