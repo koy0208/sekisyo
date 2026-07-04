@@ -16,7 +16,7 @@ export const CHART_COLORS = [
 
 const categoryChartConfig = {
   total_amount: {
-    label: "Amount",
+    label: "金額",
     color: "var(--chart-1)",
   },
 } satisfies ChartConfig

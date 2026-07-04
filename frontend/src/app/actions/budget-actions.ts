@@ -1,34 +1,9 @@
 'use server'
 
 import { runAthenaQuery } from "@/lib/athena";
+import { assertAmount, assertUnit, assertYearMonth } from "@/lib/query-guards";
 
 const BUDGET_DB = 'sekisyo'
-
-// Server Action は実体が公開 POST エンドポイントで、引数の TS 型は実行時に
-// 強制されない。SQL に直接埋め込む値はここで必ず検証する（SQL インジェクション対策）。
-function assertYearMonth(yearMonth: string): string {
-  if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
-    throw new Error(`Invalid yearMonth: ${yearMonth}`)
-  }
-  return yearMonth
-}
-
-// interval の単位は固定の allowlist のみ許可する
-const ALLOWED_UNITS = new Set(['day', 'week', 'month', 'year'])
-function assertUnit(unit: string): string {
-  if (!ALLOWED_UNITS.has(unit)) {
-    throw new Error(`Invalid unit: ${unit}`)
-  }
-  return unit
-}
-
-// interval の数量は正の整数のみ許可する
-function assertAmount(amount: number): number {
-  if (!Number.isInteger(amount) || amount <= 0) {
-    throw new Error(`Invalid amount: ${amount}`)
-  }
-  return amount
-}
 
 function prevMonth(yearMonth: string): string {
   const [y, m] = yearMonth.split('-').map(Number)

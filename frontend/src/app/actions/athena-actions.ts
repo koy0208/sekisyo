@@ -1,9 +1,17 @@
 'use server'
 
 import { runAthenaQuery } from "@/lib/athena";
+import { assertAmount, assertUnit } from "@/lib/query-guards";
 
 function isAllPeriod(unit: string) {
   return unit === 'all'
+}
+
+// 非 all の期間指定を検証して SQL の interval 句に埋め込める形にする。
+// 'all' はクエリ分岐で処理し、文字列自体は SQL に埋め込まない。
+function assertPeriod(amount: number, unit: string) {
+  assertAmount(amount)
+  assertUnit(unit)
 }
 
 export async function getActivity(amount: number = 1, unit: string = 'month') {
@@ -23,6 +31,7 @@ export async function getActivity(amount: number = 1, unit: string = 'month') {
     `;
     return await runAthenaQuery(query);
   }
+  assertPeriod(amount, unit)
   const query = `
     SELECT date, val as active_zone_minutes, ma as active_zone_ma
     FROM (
@@ -59,6 +68,7 @@ export async function getLowIntensity(amount: number = 1, unit: string = 'month'
     `;
     return await runAthenaQuery(query);
   }
+  assertPeriod(amount, unit)
   const query = `
     SELECT date, val as low_intensity_minutes, ma as low_intensity_ma
     FROM (
@@ -98,6 +108,7 @@ export async function getSleep(amount: number = 1, unit: string = 'month') {
     `;
     return await runAthenaQuery(query);
   }
+  assertPeriod(amount, unit)
   const query = `
     WITH daily_totals AS (
       SELECT
@@ -152,6 +163,7 @@ export async function getSteps(amount: number = 1, unit: string = 'month') {
     `;
     return await runAthenaQuery(query);
   }
+  assertPeriod(amount, unit)
   const query = `
     SELECT date, val as steps, ma as steps_ma
     FROM (
@@ -171,11 +183,29 @@ export async function getSteps(amount: number = 1, unit: string = 'month') {
   return await runAthenaQuery(query);
 }
 
-export async function getDataUpdateStatus() {
+// StatsCard 用: 選択期間と独立に、各指標の最新日の値と日付を 1 クエリで返す。
+// (従来は選択期間の配列末尾を「今日の値」として表示しており、期間切替で意味が変わっていた)
+export async function getLatestStats() {
   const query = `
-    SELECT MAX(date) as last_updated
-    FROM fitbit.steps
+    SELECT * FROM (
+      SELECT 'steps' AS metric, date, SUM(CAST(steps AS DOUBLE)) AS val
+      FROM fitbit.steps GROUP BY date ORDER BY date DESC LIMIT 1
+    )
+    UNION ALL
+    SELECT * FROM (
+      SELECT 'sleep' AS metric, date, SUM(total_sleep_hour) AS val
+      FROM fitbit.sleep GROUP BY date ORDER BY date DESC LIMIT 1
+    )
+    UNION ALL
+    SELECT * FROM (
+      SELECT 'active_zone' AS metric, date, SUM(active_zone_minutes) AS val
+      FROM fitbit.activity GROUP BY date ORDER BY date DESC LIMIT 1
+    )
+    UNION ALL
+    SELECT * FROM (
+      SELECT 'low_intensity' AS metric, date, SUM(low_intensity_minutes) AS val
+      FROM fitbit.low_intensity GROUP BY date ORDER BY date DESC LIMIT 1
+    )
   `;
-  const result = await runAthenaQuery(query);
-  return result[0]?.last_updated;
+  return await runAthenaQuery(query);
 }

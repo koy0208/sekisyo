@@ -68,7 +68,7 @@ export function CumulativeSpendingCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Cumulative Spending</CardTitle>
+        <CardTitle>累積支出</CardTitle>
         <CategoryFilter
           categories={categories}
           selected={selected}

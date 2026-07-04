@@ -6,9 +6,9 @@ import { Activity, Wallet, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
-  { href: "/activity", label: "Activity", icon: Activity },
-  { href: "/budget", label: "Budget", icon: Wallet },
-  { href: "/timeline", label: "Timeline", icon: MapPin },
+  { href: "/activity", label: "アクティビティ", icon: Activity },
+  { href: "/budget", label: "家計", icon: Wallet },
+  { href: "/timeline", label: "タイムライン", icon: MapPin },
 ]
 
 export function MobileNav() {

@@ -3,30 +3,17 @@ import { StatsCard } from "@/components/dashboard/stats-card"
 import { CategoryBreakdownChart } from "@/components/budget/budget-charts"
 import { CumulativeSpendingCard } from "@/components/budget/cumulative-spending-card"
 import { DailyCategoryCard } from "@/components/budget/daily-category-card"
+import { PeriodSelector } from "@/components/shared/period-selector"
+import { DataError } from "@/components/shared/data-error"
 import { getDailyCategorySpending, getCategoryBreakdown, getMonthSummary, getMonthComparison, getDailySpendingByPeriod, getDailyIncomeByPeriod } from "@/app/actions/budget-actions"
 import { MonthPicker } from "@/components/budget/month-picker"
+import { resolvePeriod, periodToInterval } from "@/lib/period"
 import { Wallet, Receipt, Tags, TrendingUp } from "lucide-react"
 import { AthenaRow } from "@/lib/athena"
-import Link from "next/link"
+import { settle } from "@/lib/utils"
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
-
-type PeriodOption = {
-  label: string
-  amount?: number
-  unit?: string
-  key: string
-}
-
-const PERIOD_OPTIONS: PeriodOption[] = [
-  { label: "1M", amount: 1, unit: "month", key: "1m" },
-  { label: "3M", amount: 3, unit: "month", key: "3m" },
-  { label: "6M", amount: 6, unit: "month", key: "6m" },
-  { label: "1Y", amount: 1, unit: "year", key: "1y" },
-  { label: "2Y", amount: 2, unit: "year", key: "2y" },
-  { label: "All", key: "all" },
-]
 
 function getCurrentYearMonth(): string {
   const now = new Date()
@@ -52,56 +39,41 @@ export default async function BudgetPage({
   const params = await searchParams
   const targetMonth = params.month || getCurrentYearMonth()
   const prevMonth = getPrevYearMonth(targetMonth)
-  const currentPeriodKey = params.period || "3m"
-  const selectedPeriod = PERIOD_OPTIONS.find(p => p.key === currentPeriodKey) || PERIOD_OPTIONS[1]
+  const period = resolvePeriod(params.period, '3m')
+  const interval = periodToInterval(period)
 
-  let dailyCategoryData: { month: string; day_of_month: number; major_category: string; daily_total: number }[] = []
-  let allCategories: string[] = []
-  let categoryData: { major_category: string; total_amount: number }[] = []
-  let totalAmount = 0
-  let transactionCount = 0
-  let categoryCount = 0
+  const [rawDailyCategory, rawCategory, rawSummary, rawComparison, rawSpendingTrend, rawIncomeTrend] = await Promise.all([
+    settle(getDailyCategorySpending(targetMonth), "daily category"),
+    settle(getCategoryBreakdown(targetMonth), "category breakdown"),
+    settle(getMonthSummary(targetMonth), "month summary"),
+    settle(getMonthComparison(targetMonth), "month comparison"),
+    settle(getDailySpendingByPeriod(interval?.amount, interval?.unit), "spending trend"),
+    settle(getDailyIncomeByPeriod(interval?.amount, interval?.unit), "income trend"),
+  ])
+
+  const dailyCategoryData = rawDailyCategory?.map((row: AthenaRow) => ({
+    month: row.month || '',
+    day_of_month: Number(row.day_of_month),
+    major_category: row.major_category || '不明',
+    daily_total: Number(row.daily_total || 0),
+  })) ?? null
+
+  const categoryData = rawCategory?.map((row: AthenaRow) => ({
+    major_category: row.major_category || "不明",
+    total_amount: Number(row.total_amount || 0),
+  })) ?? null
+
+  // カテゴリフィルタ UI は内訳(金額降順)の並び順を使う
+  const allCategories = categoryData?.map((c) => c.major_category) ?? []
+
+  const summary = rawSummary?.[0]
+  const totalAmount = Number(summary?.total_amount || 0)
+  const transactionCount = Number(summary?.transaction_count || 0)
+  const categoryCount = Number(summary?.category_count || 0)
+
+  // 前月比
   let deltaPercent: number | null = null
-  let spendingTrend: { date_key: string; category: string; daily_total: number }[] = []
-  let spendingCategories: string[] = []
-  let incomeTrend: { date_key: string; category: string; daily_total: number }[] = []
-  let incomeCategories: string[] = []
-
-  try {
-    const [rawDailyCategory, rawCategory, rawSummary, rawComparison, rawSpendingTrend, rawIncomeTrend] = await Promise.all([
-      getDailyCategorySpending(targetMonth),
-      getCategoryBreakdown(targetMonth),
-      getMonthSummary(targetMonth),
-      getMonthComparison(targetMonth),
-      getDailySpendingByPeriod(selectedPeriod.amount, selectedPeriod.unit),
-      getDailyIncomeByPeriod(selectedPeriod.amount, selectedPeriod.unit),
-    ])
-
-    // Process daily category data
-    dailyCategoryData = rawDailyCategory.map((row: AthenaRow) => ({
-      month: row.month || '',
-      day_of_month: Number(row.day_of_month),
-      major_category: row.major_category || '不明',
-      daily_total: Number(row.daily_total || 0),
-    }))
-
-    // Process category data
-    categoryData = rawCategory.map((row: AthenaRow) => ({
-      major_category: row.major_category || "不明",
-      total_amount: Number(row.total_amount || 0),
-    }))
-
-    // Use category breakdown order (by total amount desc) for filter UI
-    allCategories = categoryData.map((c) => c.major_category)
-
-    // Process summary
-    if (rawSummary.length > 0) {
-      totalAmount = Number(rawSummary[0].total_amount || 0)
-      transactionCount = Number(rawSummary[0].transaction_count || 0)
-      categoryCount = Number(rawSummary[0].category_count || 0)
-    }
-
-    // Process comparison for MoM delta
+  if (rawComparison) {
     let currentTotal = 0
     let prevTotal = 0
     for (const row of rawComparison) {
@@ -111,108 +83,129 @@ export default async function BudgetPage({
     if (prevTotal > 0) {
       deltaPercent = ((currentTotal - prevTotal) / prevTotal) * 100
     }
-
-    // Process spending trend
-    spendingTrend = rawSpendingTrend.map((row: AthenaRow) => ({
-      date_key: row.date_key || '',
-      category: row.major_category || '不明',
-      daily_total: Number(row.daily_total || 0),
-    }))
-    const spendingCatSet = new Set(spendingTrend.map(r => r.category))
-    spendingCategories = Array.from(spendingCatSet)
-
-    // Process income trend
-    incomeTrend = rawIncomeTrend.map((row: AthenaRow) => ({
-      date_key: row.date_key || '',
-      category: row.category || '不明',
-      daily_total: Number(row.daily_total || 0),
-    }))
-    const incomeCatSet = new Set(incomeTrend.map(r => r.category))
-    incomeCategories = Array.from(incomeCatSet)
-  } catch (error) {
-    console.error("Failed to fetch budget data from Athena:", error)
   }
+
+  const spendingTrend = rawSpendingTrend?.map((row: AthenaRow) => ({
+    date_key: row.date_key || '',
+    category: row.major_category || '不明',
+    daily_total: Number(row.daily_total || 0),
+  })) ?? null
+  const spendingCategories = Array.from(new Set((spendingTrend ?? []).map(r => r.category)))
+
+  const incomeTrend = rawIncomeTrend?.map((row: AthenaRow) => ({
+    date_key: row.date_key || '',
+    category: row.category || '不明',
+    daily_total: Number(row.daily_total || 0),
+  })) ?? null
+  const incomeCategories = Array.from(new Set((incomeTrend ?? []).map(r => r.category)))
+
+  const allFailed = !rawDailyCategory && !rawCategory && !rawSummary && !rawSpendingTrend
 
   return (
     <div className="flex-col md:flex">
       <div className="flex-1 space-y-4 p-4 md:p-8 md:pt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Budget</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">家計</h2>
           <MonthPicker currentMonth={targetMonth} />
         </div>
 
+        {allFailed && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+            データの取得に失敗しました。時間をおいて再読み込みしてください。
+          </div>
+        )}
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatsCard
-            title="Total Spending"
-            value={`¥${totalAmount.toLocaleString()}`}
+            title="支出合計"
+            value={summary ? `¥${totalAmount.toLocaleString()}` : "—"}
             icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
             delta={deltaPercent}
-            deltaLabel="vs prev month"
+            deltaLabel="前月比"
           />
           <StatsCard
-            title="Transactions"
-            value={transactionCount}
+            title="取引数"
+            value={summary ? transactionCount : "—"}
             unit="件"
             icon={<Receipt className="h-4 w-4 text-muted-foreground" />}
           />
           <StatsCard
-            title="Categories"
-            value={categoryCount}
+            title="カテゴリ数"
+            value={summary ? categoryCount : "—"}
             icon={<Tags className="h-4 w-4 text-muted-foreground" />}
           />
           <StatsCard
-            title="Top Category"
-            value={categoryData.length > 0 ? categoryData[0].major_category : "-"}
-            description={categoryData.length > 0 ? `¥${categoryData[0].total_amount.toLocaleString()}` : undefined}
+            title="最多カテゴリ"
+            value={categoryData?.length ? categoryData[0].major_category : "—"}
+            description={categoryData?.length ? `¥${categoryData[0].total_amount.toLocaleString()}` : undefined}
             icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <CumulativeSpendingCard
-            data={dailyCategoryData}
-            categories={allCategories}
-            currentLabel={formatYearMonth(targetMonth)}
-            previousLabel={formatYearMonth(prevMonth)}
-            targetMonth={targetMonth}
-          />
+          {dailyCategoryData ? (
+            <CumulativeSpendingCard
+              data={dailyCategoryData}
+              categories={allCategories}
+              currentLabel={formatYearMonth(targetMonth)}
+              previousLabel={formatYearMonth(prevMonth)}
+              targetMonth={targetMonth}
+            />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>累積支出</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DataError />
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
-              <CardTitle>Category Breakdown ({formatYearMonth(targetMonth)})</CardTitle>
+              <CardTitle>カテゴリ内訳({formatYearMonth(targetMonth)})</CardTitle>
             </CardHeader>
             <CardContent>
-              <CategoryBreakdownChart data={categoryData} />
+              {categoryData ? <CategoryBreakdownChart data={categoryData} /> : <DataError />}
             </CardContent>
           </Card>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1">
-          {PERIOD_OPTIONS.map((opt) => (
-            <Link
-              key={opt.key}
-              href={`/budget?month=${targetMonth}&period=${opt.key}`}
-              className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                currentPeriodKey === opt.key
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted hover:bg-muted/80"
-              }`}
-            >
-              {opt.label}
-            </Link>
-          ))}
-        </div>
+        <PeriodSelector basePath="/budget" currentKey={period.key} extraParams={{ month: targetMonth }} />
 
         <div className="grid gap-4 md:grid-cols-2">
-          <DailyCategoryCard
-            data={spendingTrend}
-            categories={spendingCategories}
-            title="Spending Trend"
-          />
-          <DailyCategoryCard
-            data={incomeTrend}
-            categories={incomeCategories}
-            title="Income Trend"
-          />
+          {spendingTrend ? (
+            <DailyCategoryCard
+              data={spendingTrend}
+              categories={spendingCategories}
+              title="支出の推移"
+            />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>支出の推移</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DataError />
+              </CardContent>
+            </Card>
+          )}
+          {incomeTrend ? (
+            <DailyCategoryCard
+              data={incomeTrend}
+              categories={incomeCategories}
+              title="収入の推移"
+            />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>収入の推移</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DataError />
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

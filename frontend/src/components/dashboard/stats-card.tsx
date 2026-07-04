@@ -5,17 +5,22 @@ interface StatsCardProps {
   title: string
   value: string | number
   unit?: string
+  // 値がいつ時点のものか(例: "7/4")。「今日の値」と誤読させないため必ず日付を明示する
+  asOf?: string
   description?: string
   icon?: React.ReactNode
   delta?: number | null
   deltaLabel?: string
 }
 
-export function StatsCard({ title, value, unit, description, icon, delta, deltaLabel }: StatsCardProps) {
+export function StatsCard({ title, value, unit, asOf, description, icon, delta, deltaLabel }: StatsCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium">
+          {title}
+          {asOf && <span className="ml-1.5 font-normal text-muted-foreground">({asOf})</span>}
+        </CardTitle>
         {icon}
       </CardHeader>
       <CardContent>

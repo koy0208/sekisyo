@@ -1,6 +1,7 @@
 'use server'
 
 import { runAthenaQuery } from "@/lib/athena";
+import { assertIsoDate, escapeSqlString } from "@/lib/query-guards";
 
 const TIMELINE_DB = 'sekisyo'
 
@@ -37,7 +38,7 @@ export async function getTimelineRanking() {
 // date 省略時はデータが存在する最新日を返す（date 列を含むのでクライアントで判別可能）
 export async function getTimelineDayHistory(date?: string) {
   const dateExpr = date
-    ? `'${date.replace(/'/g, "''")}'`
+    ? `'${assertIsoDate(date)}'`
     : `(SELECT max(date) FROM visits WHERE hierarchy_level = 0)`
   const query = `
     SELECT
@@ -102,7 +103,7 @@ export async function getTimelineDateRange() {
 // （place_name は表記揺れ・名称変更で 1 場所に複数あり得るため一致条件に使わない）
 export async function getTimelinePlaceVisits(placeId: string) {
   // 自前データだが念のためシングルクオートをエスケープ
-  const safe = placeId.replace(/'/g, "''")
+  const safe = escapeSqlString(placeId)
   const query = `
     SELECT
       date,

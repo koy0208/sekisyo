@@ -5,39 +5,39 @@ import { ChartContainer, ChartTooltipContent, type ChartConfig } from "@/compone
 
 const chartConfig = {
   steps: {
-    label: "Steps",
+    label: "歩数",
     color: "var(--chart-1)",
   },
   steps_ma: {
-    label: "30d Moving Avg",
+    label: "30日移動平均",
     color: "hsl(0 84.2% 60.2%)", // 赤っぽい色
   },
   low_intensity_minutes: {
-    label: "Low Intensity",
+    label: "低強度",
     color: "var(--chart-1)",
   },
   low_intensity_ma: {
-    label: "30d Moving Avg",
+    label: "30日移動平均",
     color: "hsl(0 84.2% 60.2%)", // 赤っぽい色
   },
   total_sleep_hour: {
-    label: "Sleep Hours",
+    label: "睡眠時間",
     color: "var(--chart-1)",
   },
   total_sleep_hour_ma: {
-    label: "30d Moving Avg",
+    label: "30日移動平均",
     color: "hsl(0 84.2% 60.2%)", // 赤っぽい色
   },
   sleep_range: {
-    label: "Sleep Schedule",
+    label: "就寝〜起床",
     color: "var(--chart-1)",
   },
   active_zone_minutes: {
-    label: "High Intensity",
+    label: "高強度",
     color: "var(--chart-1)",
   },
   active_zone_ma: {
-    label: "30d Moving Avg",
+    label: "30日移動平均",
     color: "hsl(0 84.2% 60.2%)", // 赤っぽい色
   },
 } satisfies ChartConfig
