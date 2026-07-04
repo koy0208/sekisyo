@@ -41,6 +41,13 @@ const SPEEDS: { key: string; ms: number }[] = [
 const ROLL_WINDOW: Record<Unit, number> = { month: 12, quarter: 4, year: 3 }
 const WINDOW_NOTE: Record<Unit, string> = { month: "直近12ヶ月", quarter: "直近4四半期", year: "直近3年" }
 
+// 集計範囲: 選択中の期間のみ（単期間）か、直近ローリング合計か
+type WindowMode = "single" | "rolling"
+const WINDOW_OPTIONS: { key: WindowMode; label: string }[] = [
+  { key: "single", label: "単期間" },
+  { key: "rolling", label: "直近合計" },
+]
+
 export function TimelineView({ records }: { records: RankRow[] }) {
   const [tab, setTab] = useState<"ranking" | "map">("ranking")
   const [unit, setUnit] = useState<Unit>("month")
@@ -49,6 +56,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
   const [speedKey, setSpeedKey] = useState("1x")
+  const [windowMode, setWindowMode] = useState<WindowMode>("single")
 
   const months = useMemo(
     () => Array.from(new Set(records.map((r) => r.mon))).sort(),
@@ -59,13 +67,19 @@ export function TimelineView({ records }: { records: RankRow[] }) {
   const current = buckets[safePos]
 
   // ローリング窓の下端（safePos を末尾に直近 windowSize 個。先頭付近は有る分だけ）
-  const windowSize = ROLL_WINDOW[unit]
+  // 単期間モードは窓幅 1 = 選択中の期間だけを集計する
+  const windowSize = windowMode === "rolling" ? ROLL_WINDOW[unit] : 1
   const winLo = Math.max(0, safePos - windowSize + 1)
   const windowLabel =
     winLo === safePos
       ? current?.label ?? "-"
       : `${buckets[winLo]?.label ?? ""} 〜 ${current?.label ?? ""}`
-  const windowNote = winLo === 0 ? "期間開始〜現在の合計" : `${WINDOW_NOTE[unit]}の合計`
+  const windowNote =
+    windowMode === "single"
+      ? "選択期間の合計"
+      : winLo === 0
+        ? "期間開始〜現在の合計"
+        : `${WINDOW_NOTE[unit]}の合計`
 
   const speedMs = SPEEDS.find((s) => s.key === speedKey)?.ms ?? 1100
   // 並べ替えアニメは 1 期間の間隔より少し短くして、次の遷移前に収束させる
@@ -152,8 +166,9 @@ export function TimelineView({ records }: { records: RankRow[] }) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 flex-wrap">
         <CardTitle className="text-xl font-bold tabular-nums">{windowLabel}</CardTitle>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Toggle options={UNIT_OPTIONS} value={unit} onChange={changeUnit} />
+          <Toggle options={WINDOW_OPTIONS} value={windowMode} onChange={setWindowMode} />
           <Toggle options={METRIC_OPTIONS} value={metric} onChange={setMetric} />
         </div>
       </CardHeader>
