@@ -1,4 +1,5 @@
 import { TimelineView } from "@/components/timeline/timeline-view"
+import { DayHistory } from "@/components/timeline/day-history"
 import { type RankRow } from "@/components/timeline/timeline-shared"
 import { getTimelineRanking } from "@/app/actions/timeline-actions"
 import { AthenaRow } from "@/lib/athena"
@@ -33,6 +34,7 @@ export default async function TimelinePage() {
           外出先の滞在を集計したランキング（自宅除外）。期間の単位を切替え、場所をクリックで訪問の詳細を表示。
         </p>
         <TimelineView records={records} />
+        <DayHistory />
       </div>
     </div>
   )

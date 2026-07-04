@@ -31,6 +31,41 @@ export type PlaceItem = {
   hours: number
 }
 
+// 日別履歴の 1 イベント（visit=滞在 / move=移動区間）
+export type DayEvent = {
+  kind: "visit" | "move"
+  in: string
+  out: string
+  dur: number
+  label: string // 表示名（自宅置換・移動種別の和訳を解決済み）
+  typeCode: string // semantic_type または activity_type（アイコン選択用）
+  placeId: string
+  uri?: string
+  lat: number | null
+  lng: number | null
+  endLat: number | null // move のみ（visit は null）
+  endLng: number | null
+  distM: number
+}
+
+// Google Timeline の activity_type → 日本語ラベル
+export const ACTIVITY_LABELS: Record<string, string> = {
+  WALKING: "徒歩",
+  RUNNING: "ランニング",
+  CYCLING: "自転車",
+  IN_PASSENGER_VEHICLE: "車",
+  MOTORCYCLING: "バイク",
+  IN_BUS: "バス",
+  IN_TRAIN: "電車",
+  IN_SUBWAY: "地下鉄",
+  IN_TRAM: "路面電車",
+  IN_FERRY: "フェリー",
+  SAILING: "船",
+  FLYING: "飛行機",
+  SKIING: "スキー",
+  UNKNOWN_ACTIVITY_TYPE: "移動",
+}
+
 export type Unit = "month" | "quarter" | "year"
 export type Metric = "hours" | "visits"
 
