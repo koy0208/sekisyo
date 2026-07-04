@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppSidebar } from "@/components/sidebar/app-sidebar";
+import { AppSidebar, MobileNav } from "@/components/sidebar/app-sidebar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,8 +30,10 @@ export default function RootLayout({
       >
         <div className="flex min-h-screen">
           <AppSidebar />
-          <main className="flex-1">{children}</main>
+          {/* pb はモバイル下部タブバーの高さ分。min-w-0 でチャートの横はみ出しを防ぐ */}
+          <main className="min-w-0 flex-1 pb-16 md:pb-0">{children}</main>
         </div>
+        <MobileNav />
       </body>
     </html>
   );

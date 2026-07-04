@@ -94,11 +94,11 @@ export default async function ActivityPage({
 
   return (
     <div className="flex-col md:flex">
-      <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="flex items-center justify-between space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight">Fitbit Dashboard</h2>
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1 mr-4">
+      <div className="flex-1 space-y-4 p-4 md:p-8 md:pt-6">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Fitbit Dashboard</h2>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex flex-wrap items-center gap-1">
               {PERIOD_OPTIONS.map((opt) => (
                 <Link
                   key={opt.key}
