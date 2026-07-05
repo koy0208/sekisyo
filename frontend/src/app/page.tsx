@@ -1,10 +1,12 @@
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatsCard } from "@/components/dashboard/stats-card"
 import { DataError } from "@/components/shared/data-error"
 import { fetchMart } from "@/lib/marts"
 import { type DailyRow, type MartMeta } from "@/lib/mart-types"
 import { settle, shortDate, weekStart } from "@/lib/utils"
-import { Activity, Moon, Wallet, MapPin, RefreshCw } from "lucide-react"
+import { GOALS } from "@/config/goals"
+import { Activity, Moon, Wallet, MapPin, Flame, RefreshCw } from "lucide-react"
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
@@ -72,10 +74,11 @@ export default async function HomePage() {
     .filter((r) => r.date.startsWith(currentMonth))
     .reduce((sum, r) => sum + (r.spending_total ?? 0), 0)
 
-  // 今週 (月曜始まり) の外出
+  // 今週 (月曜始まり) の外出・運動
   const weekRows = (daily ?? []).filter((r) => r.date >= thisWeekStart && r.date <= today)
   const weekVisits = weekRows.reduce((sum, r) => sum + (r.visit_count ?? 0), 0)
   const weekOutHours = weekRows.reduce((sum, r) => sum + (r.out_hours ?? 0), 0)
+  const weekActiveMin = weekRows.reduce((sum, r) => sum + (r.active_zone_min ?? 0), 0)
 
   // 直近 7 日 (新しい日が上)
   const recent = (daily ?? []).slice(-7).reverse()
@@ -100,6 +103,7 @@ export default async function HomePage() {
             value={latestSleep ? latestSleep.val.toFixed(1) : "—"}
             unit="時間"
             icon={<Moon className="h-4 w-4 text-muted-foreground" />}
+            progress={latestSleep ? { current: Number(latestSleep.val.toFixed(1)), target: GOALS.sleep_hours_min } : undefined}
           />
           <StatsCard
             title="歩数"
@@ -107,11 +111,14 @@ export default async function HomePage() {
             value={latestSteps ? latestSteps.val.toLocaleString() : "—"}
             unit="歩"
             icon={<Activity className="h-4 w-4 text-muted-foreground" />}
+            progress={latestSteps ? { current: latestSteps.val, target: GOALS.steps_per_day } : undefined}
           />
           <StatsCard
-            title="今月の支出"
-            value={daily ? `¥${monthSpending.toLocaleString()}` : "—"}
-            icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
+            title="今週の運動"
+            value={daily ? weekActiveMin : "—"}
+            unit="分"
+            icon={<Flame className="h-4 w-4 text-muted-foreground" />}
+            progress={daily ? { current: weekActiveMin, target: GOALS.active_zone_min_per_week } : undefined}
           />
           <StatsCard
             title="今週の外出"
@@ -119,6 +126,12 @@ export default async function HomePage() {
             unit="回"
             description={daily ? `計 ${weekOutHours.toFixed(1)} 時間` : undefined}
             icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
+          />
+          <StatsCard
+            title="今月の支出"
+            value={daily ? `¥${monthSpending.toLocaleString()}` : "—"}
+            icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
+            progress={daily ? { current: Math.abs(monthSpending), target: GOALS.budget_per_month, lowerIsBetter: true } : undefined}
           />
         </div>
 
@@ -144,7 +157,11 @@ export default async function HomePage() {
                   <tbody>
                     {recent.map((r) => (
                       <tr key={r.date} className="border-b last:border-0">
-                        <td className="py-2.5 pr-4 whitespace-nowrap tabular-nums">{dateWithDow(r.date)}</td>
+                        <td className="py-2.5 pr-4 whitespace-nowrap tabular-nums">
+                          <Link href={`/day/${r.date}`} className="text-primary hover:underline">
+                            {dateWithDow(r.date)}
+                          </Link>
+                        </td>
                         <td className="py-2.5 pr-4">
                           <MetricBar
                             value={r.sleep_hours}

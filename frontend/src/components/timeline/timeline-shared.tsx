@@ -47,24 +47,6 @@ export type DayEvent = {
   distM: number
 }
 
-// Google Timeline の activity_type → 日本語ラベル
-export const ACTIVITY_LABELS: Record<string, string> = {
-  WALKING: "徒歩",
-  RUNNING: "ランニング",
-  CYCLING: "自転車",
-  IN_PASSENGER_VEHICLE: "車",
-  MOTORCYCLING: "バイク",
-  IN_BUS: "バス",
-  IN_TRAIN: "電車",
-  IN_SUBWAY: "地下鉄",
-  IN_TRAM: "路面電車",
-  IN_FERRY: "フェリー",
-  SAILING: "船",
-  FLYING: "飛行機",
-  SKIING: "スキー",
-  UNKNOWN_ACTIVITY_TYPE: "移動",
-}
-
 export type Unit = "month" | "quarter" | "year"
 export type Metric = "hours" | "visits"
 

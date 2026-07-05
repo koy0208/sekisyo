@@ -92,6 +92,16 @@ export type TimelineDayEventRow = {
   dist_m: number | null
 }
 
+// marts/budget_transactions/{YYYY-MM}.json (デイビューの支出明細用)
+export type BudgetTransactionRow = {
+  date: string
+  description: string | null
+  amount: number
+  major_category: string
+  sub_category: string
+  kind: 'expense' | 'income'
+}
+
 // marts/daily.json (横断機能の基盤: 統合ホーム・デイビュー・相関ビュー用)
 export type DailyRow = {
   date: string

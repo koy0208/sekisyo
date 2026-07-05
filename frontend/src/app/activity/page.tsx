@@ -6,6 +6,7 @@ import { DataError } from "@/components/shared/data-error"
 import { fetchMart } from "@/lib/marts"
 import { type ActivityDailyRow, type ActivityMonthlyRow } from "@/lib/mart-types"
 import { resolvePeriod, periodCutoff } from "@/lib/period"
+import { GOALS } from "@/config/goals"
 import { Activity, Moon, RefreshCw, Flame, Zap } from "lucide-react"
 import { settle, shortDate } from "@/lib/utils"
 
@@ -122,6 +123,7 @@ export default async function ActivityPage({
             value={latestSteps ? latestSteps.val.toLocaleString() : "—"}
             unit="歩"
             icon={<Activity className="h-4 w-4 text-muted-foreground" />}
+            progress={latestSteps ? { current: latestSteps.val, target: GOALS.steps_per_day } : undefined}
           />
           <StatsCard
             title="睡眠"
@@ -129,6 +131,7 @@ export default async function ActivityPage({
             value={latestSleep ? latestSleep.val.toFixed(1) : "—"}
             unit="時間"
             icon={<Moon className="h-4 w-4 text-muted-foreground" />}
+            progress={latestSleep ? { current: Number(latestSleep.val.toFixed(1)), target: GOALS.sleep_hours_min } : undefined}
           />
           <StatsCard
             title="高強度"

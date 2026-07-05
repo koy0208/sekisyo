@@ -11,9 +11,30 @@ interface StatsCardProps {
   icon?: React.ReactNode
   delta?: number | null
   deltaLabel?: string
+  // 目標に対する達成率バー (config/goals.ts)。lowerIsBetter は予算のような上限型
+  progress?: { current: number; target: number; lowerIsBetter?: boolean }
 }
 
-export function StatsCard({ title, value, unit, asOf, description, icon, delta, deltaLabel }: StatsCardProps) {
+function GoalProgress({ current, target, lowerIsBetter }: NonNullable<StatsCardProps['progress']>) {
+  const ratio = target > 0 ? current / target : 0
+  const achieved = lowerIsBetter ? ratio <= 1 : ratio >= 1
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full ${achieved ? "bg-emerald-500" : lowerIsBetter ? "bg-destructive" : "bg-[var(--chart-1)]"}`}
+          style={{ width: `${Math.min(ratio * 100, 100)}%` }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        {current.toLocaleString()} / {target.toLocaleString()}
+        {achieved && !lowerIsBetter && " ✓"}
+      </p>
+    </div>
+  )
+}
+
+export function StatsCard({ title, value, unit, asOf, description, icon, delta, deltaLabel, progress }: StatsCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -36,6 +57,7 @@ export function StatsCard({ title, value, unit, asOf, description, icon, delta, 
           </p>
         )}
         {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        {progress && <GoalProgress {...progress} />}
       </CardContent>
     </Card>
   )

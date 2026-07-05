@@ -9,6 +9,7 @@ import { MonthPicker } from "@/components/budget/month-picker"
 import { fetchMart } from "@/lib/marts"
 import { type BudgetDailyRow, type BudgetMonthlyRow } from "@/lib/mart-types"
 import { resolvePeriod, periodCutoff, type Period } from "@/lib/period"
+import { GOALS } from "@/config/goals"
 import { Wallet, Receipt, Tags, TrendingUp } from "lucide-react"
 import { settle, weekStart } from "@/lib/utils"
 
@@ -127,6 +128,7 @@ export default async function BudgetPage({
             icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
             delta={deltaPercent}
             deltaLabel="前月比"
+            progress={target ? { current: Math.abs(totalAmount), target: GOALS.budget_per_month, lowerIsBetter: true } : undefined}
           />
           <StatsCard
             title="取引数"
@@ -155,6 +157,7 @@ export default async function BudgetPage({
               currentLabel={formatYearMonth(targetMonth)}
               previousLabel={formatYearMonth(prevMonth)}
               targetMonth={targetMonth}
+              budgetLine={-GOALS.budget_per_month}
             />
           ) : (
             <Card>

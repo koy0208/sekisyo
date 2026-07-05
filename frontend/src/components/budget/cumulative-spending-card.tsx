@@ -18,6 +18,8 @@ interface CumulativeSpendingCardProps {
   currentLabel: string
   previousLabel: string
   targetMonth: string
+  // 月予算の水平線 (支出は負値で累積するため負の値を渡す)
+  budgetLine?: number
 }
 
 export function CumulativeSpendingCard({
@@ -26,6 +28,7 @@ export function CumulativeSpendingCard({
   currentLabel,
   previousLabel,
   targetMonth,
+  budgetLine,
 }: CumulativeSpendingCardProps) {
   const [selected, setSelected] = useState(() => new Set(categories))
 
@@ -81,6 +84,7 @@ export function CumulativeSpendingCard({
           currentLabel={currentLabel}
           previousLabel={previousLabel}
           targetMonth={targetMonth}
+          budgetLine={budgetLine}
         />
       </CardContent>
     </Card>

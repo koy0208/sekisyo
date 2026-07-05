@@ -1,6 +1,6 @@
 'use client'
 
-import { Bar, XAxis, YAxis, Tooltip, Legend, Line, ComposedChart, Cell } from "recharts"
+import { Bar, XAxis, YAxis, Tooltip, Legend, Line, ComposedChart, Cell, ReferenceLine } from "recharts"
 import { ChartContainer, ChartTooltipContent, ChartLegendContent, type ChartConfig } from "@/components/ui/chart"
 
 export const CHART_COLORS = [
@@ -27,11 +27,12 @@ interface CumulativeData {
   previous: number | null
 }
 
-export function CumulativeSpendingChart({ data, currentLabel, previousLabel, targetMonth }: {
+export function CumulativeSpendingChart({ data, currentLabel, previousLabel, targetMonth, budgetLine }: {
   data: CumulativeData[]
   currentLabel: string
   previousLabel: string
   targetMonth: string
+  budgetLine?: number
 }) {
   const config = {
     current: { label: currentLabel, color: "var(--chart-1)" },
@@ -81,6 +82,14 @@ export function CumulativeSpendingChart({ data, currentLabel, previousLabel, tar
           dot={false}
           connectNulls
         />
+        {budgetLine != null && (
+          <ReferenceLine
+            y={budgetLine}
+            stroke="var(--destructive)"
+            strokeDasharray="4 4"
+            label={{ value: "予算", position: "insideTopLeft", fontSize: 11, fill: "var(--destructive)" }}
+          />
+        )}
       </ComposedChart>
     </ChartContainer>
   )

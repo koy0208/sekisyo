@@ -84,6 +84,7 @@ def create_views(con):
         SELECT
             strftime(strptime(date, '%Y/%m/%d'), '%Y-%m-%d') AS date,
             strftime(strptime(date, '%Y/%m/%d'), '%Y-%m') AS month,
+            description,
             CAST(amount AS INTEGER) AS amount,
             COALESCE(NULLIF(major_category, ''), '不明') AS major_category,
             COALESCE(NULLIF(sub_category, ''), '不明') AS sub_category
@@ -190,7 +191,7 @@ def build_activity_marts(con):
 
 # --- budget マート ------------------------------------------------------------
 
-def build_budget_marts(con):
+def build_budget_marts(con, executor):
     # 月次: 合計・取引数 + カテゴリ内訳 (収入は sub_category 単位)
     summary = rows(con, """
         SELECT month,
@@ -236,6 +237,23 @@ def build_budget_marts(con):
         ORDER BY date
     """)
     put_json("budget_daily.json", daily)
+
+    # デイビュー用の取引明細 (月別ファイル)。該当日の絞り込みはフロントで行う
+    transactions = rows(con, """
+        SELECT month, date, description, amount, major_category, sub_category,
+               CASE WHEN major_category = '収入' THEN 'income' ELSE 'expense' END AS kind
+        FROM budget
+        ORDER BY date
+    """)
+    by_month = {}
+    for r in transactions:
+        by_month.setdefault(r.pop("month"), []).append(r)
+    futures = [
+        executor.submit(put_json, f"budget_transactions/{month}.json", items)
+        for month, items in by_month.items()
+    ]
+    for f in futures:
+        f.result()
 
 
 # --- timeline マート ----------------------------------------------------------
@@ -401,8 +419,8 @@ def handler(event, context):
     build_activity_base(con)
 
     build_activity_marts(con)
-    build_budget_marts(con)
     with ThreadPoolExecutor(max_workers=16) as executor:
+        build_budget_marts(con, executor)
         day_files = build_timeline_marts(con, executor)
     build_daily_mart(con)
     meta = build_meta_mart(con)
