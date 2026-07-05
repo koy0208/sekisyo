@@ -2,14 +2,20 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Activity, Wallet, MapPin } from "lucide-react"
+import { Home, Activity, Wallet, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
+  { href: "/", label: "ホーム", icon: Home },
   { href: "/activity", label: "アクティビティ", icon: Activity },
   { href: "/budget", label: "家計", icon: Wallet },
   { href: "/timeline", label: "タイムライン", icon: MapPin },
 ]
+
+// "/" は前方一致だと全ページに一致するため完全一致にする
+function isActivePath(pathname: string, href: string): boolean {
+  return href === "/" ? pathname === "/" : pathname.startsWith(href)
+}
 
 export function MobileNav() {
   const pathname = usePathname()
@@ -17,7 +23,7 @@ export function MobileNav() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 flex border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden">
       {navItems.map((item) => {
-        const isActive = pathname.startsWith(item.href)
+        const isActive = isActivePath(pathname, item.href)
         return (
           <Link
             key={item.href}
@@ -46,7 +52,7 @@ export function AppSidebar() {
       </div>
       <nav className="flex-1 space-y-1 px-3">
         {navItems.map((item) => {
-          const isActive = pathname.startsWith(item.href)
+          const isActive = isActivePath(pathname, item.href)
           return (
             <Link
               key={item.href}

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sekisyo Dashboard",
+  title: "Sekisyo",
   description: "Personal health and budget dashboard",
 };
 

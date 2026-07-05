@@ -10,7 +10,7 @@ import { fetchMart } from "@/lib/marts"
 import { type BudgetDailyRow, type BudgetMonthlyRow } from "@/lib/mart-types"
 import { resolvePeriod, periodCutoff, type Period } from "@/lib/period"
 import { Wallet, Receipt, Tags, TrendingUp } from "lucide-react"
-import { settle } from "@/lib/utils"
+import { settle, weekStart } from "@/lib/utils"
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
@@ -29,16 +29,6 @@ function getPrevYearMonth(yearMonth: string): string {
 function formatYearMonth(yearMonth: string): string {
   const [y, m] = yearMonth.split('-').map(Number)
   return `${y}年${m}月`
-}
-
-// 週の開始日 (月曜)。旧 Athena クエリの date_trunc('week') と同じ基準
-function weekStart(date: string): string {
-  const d = new Date(`${date}T12:00:00`)
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${dd}`
 }
 
 // 日次マートを期間で絞り、週次 (1年未満) または月次 (1年以上・全期間) に再集計する

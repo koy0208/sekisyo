@@ -21,3 +21,14 @@ export function shortDate(isoDate: string): string {
   const [, m, d] = isoDate.split("-").map(Number)
   return `${m}/${d}`
 }
+
+// 週の開始日 (月曜)。旧 Athena クエリの date_trunc('week') と同じ基準。
+// 正午基準で計算し、UTC 変換による日付ズレを避ける
+export function weekStart(date: string): string {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
