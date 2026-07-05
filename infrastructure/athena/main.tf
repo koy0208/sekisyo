@@ -122,7 +122,10 @@ resource "aws_iam_access_key" "app_user_key" {
   user = aws_iam_user.app_user.name
 }
 
-# アプリ用 IAM ポリシー
+# アプリ用 IAM ポリシー。
+# 表示パスのマート移行(docs/redesign/02-data-layer.md)後は marts/ の
+# GetObject のみに縮小。Athena/Glue はアドホック分析用に残すが、
+# フロントのユーザーからは権限を外す(生データ data/** も読ませない)。
 resource "aws_iam_user_policy" "app_policy" {
   name = "${var.project_name}-policy"
   user = aws_iam_user.app_user.name
@@ -131,51 +134,9 @@ resource "aws_iam_user_policy" "app_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action = [
-          "athena:StartQueryExecution",
-          "athena:GetQueryExecution",
-          "athena:GetQueryResults",
-          "athena:StopQueryExecution"
-        ]
+        Action   = ["s3:GetObject"]
         Effect   = "Allow"
-        Resource = [aws_athena_workgroup.main.arn]
-      },
-      {
-        Action = [
-          "s3:GetBucketLocation",
-          "s3:GetObject",
-          "s3:ListBucket",
-          "s3:ListBucketMultipartUploads",
-          "s3:ListMultipartUploadParts",
-          "s3:AbortMultipartUpload",
-          "s3:PutObject"
-        ]
-        Effect = "Allow"
-        Resource = [
-          aws_s3_bucket.athena_results.arn,
-          "${aws_s3_bucket.athena_results.arn}/*"
-        ]
-      },
-      {
-        Action = [
-          "s3:GetBucketLocation",
-          "s3:GetObject",
-          "s3:ListBucket"
-        ]
-        Effect = "Allow"
-        Resource = [
-          aws_s3_bucket.data_bucket.arn,
-          "${aws_s3_bucket.data_bucket.arn}/*"
-        ]
-      },
-      {
-        Action = [
-          "glue:GetTable",
-          "glue:GetDatabase",
-          "glue:GetPartitions"
-        ]
-        Effect   = "Allow"
-        Resource = ["*"]
+        Resource = ["${aws_s3_bucket.data_bucket.arn}/marts/*"]
       }
     ]
   })

@@ -22,11 +22,11 @@ export function resolvePeriod(key: string | undefined, fallback: PeriodKey = '1m
   return PERIODS.find((p) => p.key === key) ?? PERIODS.find((p) => p.key === fallback)!
 }
 
-// Athena の interval 句用の暫定変換。マート移行(docs/redesign/02-data-layer.md)後は
-// フロント側フィルタに置き換えて削除する
-export function periodToInterval(p: Period): { amount: number; unit: 'month' | 'year' } | null {
+// 期間の下限日付 (YYYY-MM-DD)。全期間は null。
+// マートは全期間分を持ち、期間フィルタはこの値とのフロント側比較で行う
+export function periodCutoff(p: Period, now: Date = new Date()): string | null {
   if (p.months == null) return null
-  return p.months % 12 === 0
-    ? { amount: p.months / 12, unit: 'year' }
-    : { amount: p.months, unit: 'month' }
+  const d = new Date(now)
+  d.setMonth(d.getMonth() - p.months)
+  return d.toISOString().slice(0, 10)
 }

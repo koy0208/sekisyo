@@ -1,8 +1,8 @@
 import { TimelineView } from "@/components/timeline/timeline-view"
 import { DayHistory } from "@/components/timeline/day-history"
 import { type RankRow } from "@/components/timeline/timeline-shared"
-import { getTimelineRanking } from "@/app/actions/timeline-actions"
-import { AthenaRow } from "@/lib/athena"
+import { fetchMart } from "@/lib/marts"
+import { type TimelineRankingRow } from "@/lib/mart-types"
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
@@ -11,19 +11,19 @@ export default async function TimelinePage() {
   let records: RankRow[] = []
 
   try {
-    const rawRanking = await getTimelineRanking()
-    records = rawRanking.map((row: AthenaRow) => ({
-      mon: row.mon || '',
-      placeId: row.place_id || '',
+    const rawRanking = await fetchMart<TimelineRankingRow[]>("timeline_ranking.json")
+    records = rawRanking.map((row) => ({
+      mon: row.mon,
+      placeId: row.place_id,
       place_name: row.place_name || '不明',
-      uri: row.uri || undefined,
-      lat: row.lat != null ? Number(row.lat) : null,
-      lng: row.lng != null ? Number(row.lng) : null,
-      visits: Number(row.visits || 0),
-      hours: Number(row.hours || 0),
+      uri: row.uri ?? undefined,
+      lat: row.lat,
+      lng: row.lng,
+      visits: row.visits,
+      hours: row.hours,
     }))
   } catch (error) {
-    console.error("Failed to fetch timeline data from Athena:", error)
+    console.error("Failed to fetch timeline ranking mart:", error)
   }
 
   return (

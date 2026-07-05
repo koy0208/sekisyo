@@ -1,6 +1,6 @@
 # Sekisyo - Personal Health Data Dashboard
 
-Fitbit/Google Drive のデータを AWS Lambda で ETL し、S3 (Parquet) に保存、Athena で集計して Next.js ダッシュボードで可視化するプロジェクト。
+Fitbit/Google Drive のデータを AWS Lambda で ETL し、S3 (Parquet) に保存、mart_builder Lambda (DuckDB) で集計済み JSON マートを生成して Next.js ダッシュボードで可視化するプロジェクト。Athena/Glue はアドホック分析用に残す(表示パスでは使わない)。
 
 ## Project Structure
 
@@ -8,8 +8,10 @@ Fitbit/Google Drive のデータを AWS Lambda で ETL し、S3 (Parquet) に保
 sekisyo/
 ├── frontend/          # Next.js 15 ダッシュボード (TypeScript, Cloudflare Pages)
 ├── etl/               # Python Lambda ETL
-│   ├── fitbit_to_s3/  # Fitbit API → S3 (毎日 3:00 JST)
-│   └── gdrive_to_s3/  # Google Drive → S3 (毎週月曜 4:00 JST)
+│   ├── fitbit_to_s3/        # Fitbit API → S3 (毎日 3:00 JST)
+│   ├── gdrive_to_s3/        # Google Drive → S3 (毎週月曜 4:00 JST)
+│   ├── timeline_to_parquet/ # タイムライン JSON → Parquet (S3 Put で起動)
+│   └── mart_builder/        # S3 生データ → marts/*.json (毎日 3:45 / 月曜 4:30 JST)
 ├── infrastructure/    # Terraform (AWS)
 │   ├── athena/        # Athena workgroup, Glue catalog, IAM user
 │   └── lambda/        # Lambda, ECR, EventBridge
@@ -46,20 +48,21 @@ terraform init && terraform plan && terraform apply
 
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS v4, Shadcn UI, Recharts
 - **Deployment**: Cloudflare Pages (wrangler)
-- **ETL**: Python 3.11, pandas, PyArrow, Docker (AWS Lambda)
-- **Data**: S3 (Parquet), Amazon Athena, Glue Catalog
+- **ETL**: Python 3.11, pandas, PyArrow, DuckDB (mart_builder), Docker (AWS Lambda)
+- **Data**: S3 (Parquet + JSON マート), Amazon Athena / Glue Catalog (アドホック分析用)
 - **IaC**: Terraform
 - **Region**: ap-northeast-1
 
 ## Data Flow
 
-Fitbit API / Google Drive → Lambda ETL → S3 (Parquet) → Athena → Next.js Server Actions → Recharts
+Fitbit API / Google Drive → Lambda ETL → S3 data/ (Parquet/CSV) → mart_builder Lambda (DuckDB) → S3 marts/*.json → Next.js (lib/marts.ts) → Recharts
 
 ## Key Files
 
 - `frontend/src/app/page.tsx` - メインダッシュボード
-- `frontend/src/app/actions/athena-actions.ts` - Athena クエリ (Server Actions)
-- `frontend/src/lib/athena.ts` - Athena クライアント
+- `frontend/src/lib/marts.ts` - マート読み取り層 (S3 GetObject + キャッシュ)
+- `frontend/src/lib/mart-types.ts` - マートの型定義 (mart_builder と手動同期)
+- `etl/mart_builder/lambda_function.py` - マートビルダー (集計 SQL の一元管理)
 - `etl/fitbit_to_s3/lambda_function.py` - Fitbit ETL
 - `etl/gdrive_to_s3/lambda_function.py` - Google Drive ETL
 

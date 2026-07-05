@@ -95,33 +95,24 @@ export function SleepChart({ data }: { data: (ChartData & { total_sleep_hour: nu
   )
 }
 
-export function SleepScheduleChart({ data }: { data: (ChartData & { start_time: string; end_time: string })[] }) {
-  const processedData = data.map(d => {
-    const dateStr = d.date;
-    const start = new Date(d.start_time);
-    const end = new Date(d.end_time);
-    
-    // Calculate hours from midnight of the 'date'
-    // If date is "2024-11-29", midnight is 2024-11-29T00:00:00
-    const midnight = new Date(`${dateStr}T00:00:00`);
-    
-    let startOffset = (start.getTime() - midnight.getTime()) / (1000 * 60 * 60);
-    let endOffset = (end.getTime() - midnight.getTime()) / (1000 * 60 * 60);
+export function SleepScheduleChart({ data }: { data: (ChartData & { sleep_start: string | null; sleep_end: string | null })[] }) {
+  // "23:40" → 就寝日基準の時間オフセット。18 時以降は前日の夜とみなして負にする
+  // (マートの sleep_start/sleep_end は HH:MM のみで日付を持たない)
+  const toOffset = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    const offset = h + m / 60;
+    return offset > 18 ? offset - 24 : offset;
+  };
 
-    // If start is more than 18 hours after midnight, it's probably for the previous day's sleep ending on this date
-    if (startOffset > 18) {
-      startOffset -= 24;
-      endOffset -= 24;
-    } else if (startOffset < -12) {
-      startOffset += 24;
-      endOffset += 24;
+  const processedData = data.map(d => {
+    if (!d.sleep_start || !d.sleep_end) {
+      return { ...d, range: null, startLabel: "", endLabel: "" };
     }
-    
     return {
       ...d,
-      range: [startOffset, endOffset],
-      startLabel: start.toLocaleTimeString("ja-JP", { hour: '2-digit', minute: '2-digit' }),
-      endLabel: end.toLocaleTimeString("ja-JP", { hour: '2-digit', minute: '2-digit' }),
+      range: [toOffset(d.sleep_start), toOffset(d.sleep_end)],
+      startLabel: d.sleep_start,
+      endLabel: d.sleep_end,
     };
   });
 

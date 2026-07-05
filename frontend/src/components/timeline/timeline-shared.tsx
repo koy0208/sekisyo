@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { type ChartConfig } from "@/components/ui/chart"
 import { cn } from "@/lib/utils"
 import { getTimelinePlaceVisits } from "@/app/actions/timeline-actions"
-import { AthenaRow } from "@/lib/athena"
 
 // 月 × 場所のランキング 1 行（マップ用に place_id / lat / lng を保持）
 export type RankRow = {
@@ -126,12 +125,12 @@ export function usePlaceVisits(placeId: string | null): { visits: VisitRow[]; lo
     setLoading(true)
     getTimelinePlaceVisits(placeId)
       .then((rows) => {
-        const mapped: VisitRow[] = (rows as AthenaRow[]).map((r) => ({
-          date: r.date || "",
-          dow: r.dow || "",
-          in: r.in_t || "",
-          out: r.out_t || "",
-          dur: Number(r.dur || 0),
+        const mapped: VisitRow[] = rows.map((r) => ({
+          date: r.date,
+          dow: r.dow,
+          in: r.in_t,
+          out: r.out_t,
+          dur: r.dur,
         }))
         visitsCache.set(placeId, mapped)
       })

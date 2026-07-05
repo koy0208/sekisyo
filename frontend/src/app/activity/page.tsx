@@ -3,30 +3,28 @@ import { StatsCard } from "@/components/dashboard/stats-card"
 import { StepChart, LowIntensityChart, SleepChart, SleepScheduleChart, HighIntensityChart } from "@/components/dashboard/charts"
 import { PeriodSelector } from "@/components/shared/period-selector"
 import { DataError } from "@/components/shared/data-error"
-import { getSteps, getSleep, getLowIntensity, getActivity, getLatestStats } from "@/app/actions/athena-actions"
-import { resolvePeriod, periodToInterval } from "@/lib/period"
+import { fetchMart } from "@/lib/marts"
+import { type ActivityDailyRow, type ActivityMonthlyRow } from "@/lib/mart-types"
+import { resolvePeriod, periodCutoff } from "@/lib/period"
 import { Activity, Moon, RefreshCw, Flame, Zap } from "lucide-react"
-import { AthenaRow } from "@/lib/athena"
 import { settle, shortDate } from "@/lib/utils"
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
 
-interface BaseData {
-  date: string;
-}
-
-type StepData = BaseData & { steps: number; steps_ma: number | null };
-type SleepData = BaseData & {
-  total_sleep_hour: number;
-  total_sleep_hour_ma: number | null;
-  start_time: string;
-  end_time: string;
-};
-type LowIntensityData = BaseData & { low_intensity_minutes: number; low_intensity_ma: number | null };
-type ActivityData = BaseData & { active_zone_minutes: number; active_zone_ma: number | null };
-
 type LatestStat = { date: string; val: number }
+
+// 指標ごとの最新値 (選択期間と独立)。値が存在する最後の日を採用する
+function latestOf(
+  rows: ActivityDailyRow[],
+  key: 'steps' | 'sleep_hours' | 'active_zone_min' | 'low_intensity_min'
+): LatestStat | undefined {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const val = rows[i][key]
+    if (val != null) return { date: rows[i].date, val }
+  }
+  return undefined
+}
 
 export default async function ActivityPage({
   searchParams,
@@ -34,52 +32,67 @@ export default async function ActivityPage({
   searchParams: Promise<{ period?: string }>
 }) {
   const period = resolvePeriod((await searchParams).period)
-  const interval = periodToInterval(period)
-  const amount = interval?.amount ?? 0
-  const unit = interval?.unit ?? 'all'
+  const cutoff = periodCutoff(period)
+  const isAll = period.months == null
 
-  const [rawSteps, rawSleep, rawLowIntensity, rawActivity, rawLatest] = await Promise.all([
-    settle(getSteps(amount, unit), "steps"),
-    settle(getSleep(amount, unit), "sleep"),
-    settle(getLowIntensity(amount, unit), "low intensity"),
-    settle(getActivity(amount, unit), "activity"),
-    settle(getLatestStats(), "latest stats"),
+  const [dailyMart, monthlyMart] = await Promise.all([
+    settle(fetchMart<ActivityDailyRow[]>("activity_daily.json"), "activity daily mart"),
+    isAll
+      ? settle(fetchMart<ActivityMonthlyRow[]>("activity_monthly.json"), "activity monthly mart")
+      : Promise.resolve(null),
   ])
 
-  const steps: StepData[] | null = rawSteps?.map((d: AthenaRow) => ({
-    date: d.date || "",
-    steps: Number(d.steps || 0),
-    steps_ma: d.steps_ma !== undefined ? Number(d.steps_ma) : null
-  })) ?? null
-  const sleep: SleepData[] | null = rawSleep?.map((d: AthenaRow) => ({
-    date: d.date || "",
-    total_sleep_hour: Number(d.total_sleep_hour || 0),
-    total_sleep_hour_ma: d.total_sleep_hour_ma !== undefined ? Number(d.total_sleep_hour_ma) : null,
-    start_time: d.start_time || "",
-    end_time: d.end_time || ""
-  })) ?? null
-  const lowIntensity: LowIntensityData[] | null = rawLowIntensity?.map((d: AthenaRow) => ({
-    date: d.date || "",
-    low_intensity_minutes: Number(d.low_intensity_minutes || 0),
-    low_intensity_ma: d.low_intensity_ma !== undefined ? Number(d.low_intensity_ma) : null
-  })) ?? null
-  const activity: ActivityData[] | null = rawActivity?.map((d: AthenaRow) => ({
-    date: d.date || "",
-    active_zone_minutes: Number(d.active_zone_minutes || 0),
-    active_zone_ma: d.active_zone_ma !== undefined ? Number(d.active_zone_ma) : null
-  })) ?? null
+  // 期間内かつ指標が存在する日のみ (旧クエリは指標ごとの GROUP BY で欠測日を返さなかった)
+  const inPeriod = dailyMart?.filter((d) => cutoff == null || d.date >= cutoff) ?? null
 
-  // 各指標の最新値(選択期間と独立)。metric 名 → {date, val}
-  const latest = new Map<string, LatestStat>()
-  for (const row of rawLatest ?? []) {
-    if (row.metric && row.date) {
-      latest.set(row.metric, { date: row.date, val: Number(row.val || 0) })
-    }
-  }
-  const latestSteps = latest.get("steps")
-  const latestSleep = latest.get("sleep")
-  const latestActive = latest.get("active_zone")
-  const latestLow = latest.get("low_intensity")
+  const steps = isAll
+    ? monthlyMart
+        ?.filter((d) => d.steps != null)
+        .map((d) => ({ date: d.month, steps: d.steps!, steps_ma: null })) ?? null
+    : inPeriod
+        ?.filter((d) => d.steps != null)
+        .map((d) => ({ date: d.date, steps: d.steps!, steps_ma: d.steps_ma })) ?? null
+
+  const sleep = isAll
+    ? monthlyMart
+        ?.filter((d) => d.sleep_hours != null)
+        .map((d) => ({
+          date: d.month,
+          total_sleep_hour: d.sleep_hours!,
+          total_sleep_hour_ma: null,
+          sleep_start: null,
+          sleep_end: null,
+        })) ?? null
+    : inPeriod
+        ?.filter((d) => d.sleep_hours != null)
+        .map((d) => ({
+          date: d.date,
+          total_sleep_hour: d.sleep_hours!,
+          total_sleep_hour_ma: d.sleep_hours_ma,
+          sleep_start: d.sleep_start,
+          sleep_end: d.sleep_end,
+        })) ?? null
+
+  const activity = isAll
+    ? monthlyMart
+        ?.filter((d) => d.active_zone_min != null)
+        .map((d) => ({ date: d.month, active_zone_minutes: d.active_zone_min!, active_zone_ma: null })) ?? null
+    : inPeriod
+        ?.filter((d) => d.active_zone_min != null)
+        .map((d) => ({ date: d.date, active_zone_minutes: d.active_zone_min!, active_zone_ma: d.active_zone_ma })) ?? null
+
+  const lowIntensity = isAll
+    ? monthlyMart
+        ?.filter((d) => d.low_intensity_min != null)
+        .map((d) => ({ date: d.month, low_intensity_minutes: d.low_intensity_min!, low_intensity_ma: null })) ?? null
+    : inPeriod
+        ?.filter((d) => d.low_intensity_min != null)
+        .map((d) => ({ date: d.date, low_intensity_minutes: d.low_intensity_min!, low_intensity_ma: d.low_intensity_ma })) ?? null
+
+  const latestSteps = dailyMart ? latestOf(dailyMart, "steps") : undefined
+  const latestSleep = dailyMart ? latestOf(dailyMart, "sleep_hours") : undefined
+  const latestActive = dailyMart ? latestOf(dailyMart, "active_zone_min") : undefined
+  const latestLow = dailyMart ? latestOf(dailyMart, "low_intensity_min") : undefined
   const allFailed = steps === null && sleep === null && lowIntensity === null && activity === null
 
   return (

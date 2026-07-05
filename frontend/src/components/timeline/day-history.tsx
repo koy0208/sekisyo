@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getTimelineDayHistory, getTimelineDateRange } from "@/app/actions/timeline-actions"
-import { AthenaRow } from "@/lib/athena"
+import { type TimelineDayEventRow } from "@/lib/mart-types"
 import { type DayEvent, ACTIVITY_LABELS } from "@/components/timeline/timeline-shared"
 
 // マップは Leaflet が window 依存のため SSR 無効でクライアントのみ読み込む
@@ -51,7 +51,7 @@ const ACTIVITY_ICONS: Record<string, LucideIcon> = {
 const HOME_TYPES = new Set(["HOME", "INFERRED_HOME"])
 const WORK_TYPES = new Set(["WORK", "INFERRED_WORK"])
 
-function mapRows(rows: AthenaRow[]): DayEvent[] {
+function mapRows(rows: TimelineDayEventRow[]): DayEvent[] {
   return rows.map((r) => {
     const kind: DayEvent["kind"] = r.kind === "move" ? "move" : "visit"
     const t = r.type_code || ""
@@ -61,21 +61,20 @@ function mapRows(rows: AthenaRow[]): DayEvent[] {
         : HOME_TYPES.has(t)
           ? "自宅"
           : r.label || (WORK_TYPES.has(t) ? "職場" : "不明な場所")
-    const num = (v: string | undefined) => (v != null && v !== "" ? Number(v) : null)
     return {
       kind,
-      in: r.in_t || "",
-      out: r.out_t || "",
-      dur: Number(r.dur || 0),
+      in: r.in_t,
+      out: r.out_t,
+      dur: r.dur,
       label,
       typeCode: t,
       placeId: r.place_id || "",
-      uri: r.uri || undefined,
-      lat: num(r.lat),
-      lng: num(r.lng),
-      endLat: num(r.end_lat),
-      endLng: num(r.end_lng),
-      distM: Number(r.dist_m || 0),
+      uri: r.uri ?? undefined,
+      lat: r.lat,
+      lng: r.lng,
+      endLat: r.end_lat,
+      endLng: r.end_lng,
+      distM: r.dist_m ?? 0,
     }
   })
 }
@@ -118,12 +117,11 @@ export function DayHistory() {
   useEffect(() => {
     let active = true
     Promise.all([getTimelineDayHistory(), getTimelineDateRange()])
-      .then(([rows, rangeRows]) => {
+      .then(([rows, r]) => {
         if (!active) return
-        const evs = mapRows(rows as AthenaRow[])
-        const r = (rangeRows as AthenaRow[])[0]
-        const min = r?.min_d || ""
-        const max = r?.max_d || ""
+        const evs = mapRows(rows)
+        const min = r.min || ""
+        const max = r.max || ""
         const d = rows[0]?.date || max || null
         if (d) dayCache.set(d, evs)
         setEvents(evs)
@@ -149,7 +147,7 @@ export function DayHistory() {
     reqRef.current = d
     setLoading(true)
     getTimelineDayHistory(d)
-      .then((rows) => dayCache.set(d, mapRows(rows as AthenaRow[])))
+      .then((rows) => dayCache.set(d, mapRows(rows)))
       .catch((e) => {
         console.error("Failed to fetch day history:", e)
         dayCache.set(d, [])
