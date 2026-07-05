@@ -25,8 +25,9 @@ sekisyo/
 ```bash
 npm run dev        # Next.js dev server (localhost:3000)
 npm run build      # Production build
-npm run deploy     # Cloudflare Pages にデプロイ
 npm run lint       # ESLint
+# デプロイは master への push で Cloudflare Pages の CD が自動実行される
+# (npm run deploy は手動用。CLOUDFLARE_API_TOKEN が必要でローカルでは通常使わない)
 ```
 
 ### ETL (Docker Lambda)

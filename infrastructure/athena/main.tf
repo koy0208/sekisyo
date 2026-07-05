@@ -34,7 +34,8 @@ resource "aws_s3_bucket_public_access_block" "data_bucket" {
   restrict_public_buckets = true
 }
 
-# デフォルト暗号化（SSE-S3）
+# デフォルト暗号化（SSE-S3）。SSE-C は鍵紛失リスクがあるためブロック
+# (AWS 側で有効化済みの設定を定義に取り込み、apply で解除されるのを防ぐ)
 resource "aws_s3_bucket_server_side_encryption_configuration" "data_bucket" {
   bucket = aws_s3_bucket.data_bucket.id
 
@@ -42,7 +43,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "data_bucket" {
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256"
     }
-    bucket_key_enabled = true
+    bucket_key_enabled       = true
+    blocked_encryption_types = ["SSE-C"]
   }
 }
 
@@ -63,7 +65,7 @@ resource "aws_s3_bucket_public_access_block" "athena_results" {
   restrict_public_buckets = true
 }
 
-# デフォルト暗号化（SSE-S3）
+# デフォルト暗号化（SSE-S3）。SSE-C ブロックは data_bucket と同様
 resource "aws_s3_bucket_server_side_encryption_configuration" "athena_results" {
   bucket = aws_s3_bucket.athena_results.id
 
@@ -71,7 +73,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "athena_results" {
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256"
     }
-    bucket_key_enabled = true
+    bucket_key_enabled       = true
+    blocked_encryption_types = ["SSE-C"]
   }
 }
 
