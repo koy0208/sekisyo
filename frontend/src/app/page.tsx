@@ -4,7 +4,7 @@ import { StatsCard } from "@/components/dashboard/stats-card"
 import { DataError } from "@/components/shared/data-error"
 import { fetchMart } from "@/lib/marts"
 import { type DailyRow, type MartMeta } from "@/lib/mart-types"
-import { settle, shortDate, weekStart } from "@/lib/utils"
+import { settle, shortDate, shiftDate } from "@/lib/utils"
 import { GOALS } from "@/config/goals"
 import { Activity, Moon, Wallet, MapPin, Flame, RefreshCw } from "lucide-react"
 
@@ -12,8 +12,19 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
 
 // 統合ホーム (docs/redesign/03-ui-unification.md 3e)。
-// 「今日/今週の自分」を 1 画面にし、各ページはここからのドリルダウン先にする。
+// 「直近の自分」を 1 画面にし、各ページはここからのドリルダウン先にする。
 // marts/daily.json + marts/meta.json の 2 fetch で全部賄う。
+//
+// 集計ウィンドウは「今週/今月」のカレンダー固定ではなく日数で選び、
+// データが存在する最新日を終点にする (家計簿・位置情報は週次同期でラグがあり、
+// カレンダー週だと直近が空に見えるため)。
+
+const WINDOW_OPTIONS = [7, 14, 30, 90] as const
+
+function resolveDays(param: string | undefined): number {
+  const n = Number(param)
+  return (WINDOW_OPTIONS as readonly number[]).includes(n) ? n : 7
+}
 
 type NumericKey = 'steps' | 'sleep_hours' | 'active_zone_min' | 'low_intensity_min'
 
@@ -26,21 +37,31 @@ function latestOf(rows: DailyRow[], key: NumericKey): { date: string; val: numbe
   return undefined
 }
 
-function todayIso(): string {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
 // "2026-07-04" → "7/4 (土)"
 function dateWithDow(isoDate: string): string {
   const dow = new Date(`${isoDate}T12:00:00`).toLocaleDateString("ja-JP", { weekday: "short" })
   return `${shortDate(isoDate)} (${dow})`
 }
 
-// 直近 7 日テーブルの横棒。週内の最大値に対する割合で幅を決める
+function DaysSelector({ current }: { current: number }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {WINDOW_OPTIONS.map((d) => (
+        <Link
+          key={d}
+          href={`/?days=${d}`}
+          className={`px-3 py-1 text-sm rounded-md transition-colors ${
+            current === d ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+          }`}
+        >
+          {d}日
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+// 直近 N 日テーブルの横棒。期間内の最大値に対する割合で幅を決める
 function MetricBar({ value, max, label }: { value: number | null; max: number; label: string }) {
   if (value == null) {
     return <span className="text-xs text-muted-foreground">—</span>
@@ -56,39 +77,53 @@ function MetricBar({ value, max, label }: { value: number | null; max: number; l
   )
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ days?: string }>
+}) {
+  const days = resolveDays((await searchParams).days)
+
   const [daily, meta] = await Promise.all([
     settle(fetchMart<DailyRow[]>("daily.json"), "daily mart"),
     settle(fetchMart<MartMeta>("meta.json"), "mart meta"),
   ])
 
-  const today = todayIso()
-  const currentMonth = today.slice(0, 7)
-  const thisWeekStart = weekStart(today)
-
   const latestSleep = daily ? latestOf(daily, "sleep_hours") : undefined
   const latestSteps = daily ? latestOf(daily, "steps") : undefined
 
-  // 今月の支出 (支出は Money Forward 由来の負値のまま扱う。家計ページと同じ表記)
-  const monthSpending = (daily ?? [])
-    .filter((r) => r.date.startsWith(currentMonth))
-    .reduce((sum, r) => sum + (r.spending_total ?? 0), 0)
+  // ウィンドウ: データが存在する最新日から N 日分
+  const endDate = daily?.[daily.length - 1]?.date
+  const startDate = endDate ? shiftDate(endDate, -(days - 1)) : undefined
+  const windowRows = endDate
+    ? (daily ?? []).filter((r) => r.date >= startDate! && r.date <= endDate)
+    : []
+  const windowLabel = `直近${days}日`
 
-  // 今週 (月曜始まり) の外出・運動
-  const weekRows = (daily ?? []).filter((r) => r.date >= thisWeekStart && r.date <= today)
-  const weekVisits = weekRows.reduce((sum, r) => sum + (r.visit_count ?? 0), 0)
-  const weekOutHours = weekRows.reduce((sum, r) => sum + (r.out_hours ?? 0), 0)
-  const weekActiveMin = weekRows.reduce((sum, r) => sum + (r.active_zone_min ?? 0), 0)
+  const sum = (key: 'active_zone_min' | 'visit_count' | 'out_hours' | 'spending_total') =>
+    windowRows.reduce((acc, r) => acc + (r[key] ?? 0), 0)
 
-  // 直近 7 日 (新しい日が上)
-  const recent = (daily ?? []).slice(-7).reverse()
+  const windowActiveMin = sum("active_zone_min")
+  const windowVisits = sum("visit_count")
+  const windowOutHours = sum("out_hours")
+  // 支出は Money Forward 由来の負値のまま合計し、表示・達成率で絶対値にする
+  const windowSpending = sum("spending_total")
+
+  // 週次・月次の目標を選択期間に比例換算する
+  const activeTarget = Math.round((GOALS.active_zone_min_per_week * days) / 7)
+  const budgetTarget = Math.round((GOALS.budget_per_month * days) / 30.44 / 1000) * 1000
+
+  const recent = [...windowRows].reverse()
   const maxSleep = Math.max(...recent.map((r) => r.sleep_hours ?? 0), 0)
   const maxSteps = Math.max(...recent.map((r) => r.steps ?? 0), 0)
 
   return (
     <div className="flex-col md:flex">
       <div className="flex-1 space-y-4 p-4 md:p-8 md:pt-6">
-        <h2 className="text-2xl md:text-3xl font-bold tracking-tight">ホーム</h2>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">ホーム</h2>
+          <DaysSelector current={days} />
+        </div>
 
         {!daily && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
@@ -114,38 +149,41 @@ export default async function HomePage() {
             progress={latestSteps ? { current: latestSteps.val, target: GOALS.steps_per_day } : undefined}
           />
           <StatsCard
-            title="今週の運動"
-            value={daily ? weekActiveMin : "—"}
+            title="運動"
+            asOf={windowLabel}
+            value={daily ? windowActiveMin : "—"}
             unit="分"
             icon={<Flame className="h-4 w-4 text-muted-foreground" />}
-            progress={daily ? { current: weekActiveMin, target: GOALS.active_zone_min_per_week } : undefined}
+            progress={daily ? { current: windowActiveMin, target: activeTarget } : undefined}
           />
           <StatsCard
-            title="今週の外出"
-            value={daily ? weekVisits : "—"}
+            title="外出"
+            asOf={windowLabel}
+            value={daily ? windowVisits : "—"}
             unit="回"
-            description={daily ? `計 ${weekOutHours.toFixed(1)} 時間` : undefined}
+            description={daily ? `計 ${windowOutHours.toFixed(1)} 時間` : undefined}
             icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
           />
           <StatsCard
-            title="今月の支出"
-            value={daily ? `¥${monthSpending.toLocaleString()}` : "—"}
+            title="支出"
+            asOf={windowLabel}
+            value={daily ? `¥${windowSpending.toLocaleString()}` : "—"}
             icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
-            progress={daily ? { current: Math.abs(monthSpending), target: GOALS.budget_per_month, lowerIsBetter: true } : undefined}
+            progress={daily ? { current: Math.abs(windowSpending), target: budgetTarget, lowerIsBetter: true } : undefined}
           />
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>直近 7 日</CardTitle>
+            <CardTitle>{windowLabel}の記録</CardTitle>
           </CardHeader>
           <CardContent>
             {recent.length === 0 ? (
               <DataError />
             ) : (
-              <div className="overflow-x-auto">
+              <div className="max-h-[560px] overflow-auto">
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="sticky top-0 bg-card">
                     <tr className="border-b text-left text-xs text-muted-foreground">
                       <th className="py-2 pr-4 font-medium">日付</th>
                       <th className="py-2 pr-4 font-medium">睡眠</th>

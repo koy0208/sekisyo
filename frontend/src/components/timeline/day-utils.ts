@@ -66,13 +66,3 @@ export function fmtDur(min: number): string {
 export function fmtDist(m: number): string {
   return m >= 1000 ? `${(m / 1000).toFixed(1)}km` : `${Math.round(m)}m`
 }
-
-// 正午基準で加減算し、UTC 変換による日付ズレを避ける
-export function shiftDate(d: string, days: number): string {
-  const t = new Date(`${d}T12:00:00`)
-  t.setDate(t.getDate() + days)
-  const y = t.getFullYear()
-  const m = String(t.getMonth() + 1).padStart(2, "0")
-  const dd = String(t.getDate()).padStart(2, "0")
-  return `${y}-${m}-${dd}`
-}

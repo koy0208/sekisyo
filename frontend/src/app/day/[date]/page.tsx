@@ -4,14 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatsCard } from "@/components/dashboard/stats-card"
 import { DataError } from "@/components/shared/data-error"
 import { DayTimeline } from "@/components/timeline/day-timeline"
-import { mapDayEvents, shiftDate } from "@/components/timeline/day-utils"
+import { mapDayEvents } from "@/components/timeline/day-utils"
 import { fetchMart, fetchMartOrNull } from "@/lib/marts"
 import {
   type BudgetTransactionRow,
   type DailyRow,
   type TimelineDayEventRow,
 } from "@/lib/mart-types"
-import { settle } from "@/lib/utils"
+import { settle, shiftDate } from "@/lib/utils"
 import { Activity, Moon, Flame, Wallet, ChevronLeft, ChevronRight } from "lucide-react"
 
 export const dynamic = 'force-dynamic'
