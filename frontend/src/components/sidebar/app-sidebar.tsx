@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Activity, Wallet, MapPin } from "lucide-react"
+import { Home, Activity, Wallet, MapPin, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/activity", label: "アクティビティ", icon: Activity },
   { href: "/budget", label: "家計", icon: Wallet },
   { href: "/timeline", label: "タイムライン", icon: MapPin },
+  { href: "/insights", label: "相関", icon: TrendingUp },
 ]
 
 // "/" は前方一致だと全ページに一致するため完全一致にする
