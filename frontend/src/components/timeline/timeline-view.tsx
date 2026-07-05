@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import dynamic from "next/dynamic"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { ChevronLeft, ChevronRight, ChevronDown, Loader2, Play, Pause } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronDown, Loader2, Play, Pause, Search, X } from "lucide-react"
 import { TimelineExplorer } from "@/components/timeline/timeline-explorer"
 import { PlaceDetail } from "@/components/timeline/place-detail"
 import {
@@ -48,6 +48,45 @@ const WINDOW_OPTIONS: { key: WindowMode; label: string }[] = [
   { key: "rolling", label: "直近合計" },
 ]
 
+// 場所名の検索用正規化 (全角/半角ゆれと大文字小文字を吸収)
+function normalize(s: string): string {
+  return s.normalize("NFKC").toLowerCase()
+}
+
+// 月フィルタ or 名前フィルタで records を場所単位に集約する。
+// 表示名/URI は最新月の値を代表採用（records は mon 昇順）
+function aggregatePlaces(
+  records: RankRow[],
+  include: (r: RankRow) => boolean,
+  metric: Metric
+): PlaceItem[] {
+  const agg = new Map<string, PlaceItem>()
+  for (const r of records) {
+    if (!include(r)) continue
+    const a =
+      agg.get(r.placeId) ??
+      ({
+        name: r.place_name,
+        placeId: r.placeId,
+        uri: r.uri,
+        lat: r.lat,
+        lng: r.lng,
+        visits: 0,
+        hours: 0,
+      } as PlaceItem)
+    a.visits += r.visits
+    a.hours += r.hours
+    if (r.place_name) a.name = r.place_name
+    if (r.uri) a.uri = r.uri
+    if (a.lat == null && r.lat != null) a.lat = r.lat
+    if (a.lng == null && r.lng != null) a.lng = r.lng
+    agg.set(r.placeId, a)
+  }
+  return Array.from(agg.values()).sort((x, y) =>
+    metric === "hours" ? y.hours - x.hours : y.visits - x.visits
+  )
+}
+
 export function TimelineView({ records }: { records: RankRow[] }) {
   const [tab, setTab] = useState<"ranking" | "map">("ranking")
   const [unit, setUnit] = useState<Unit>("month")
@@ -57,6 +96,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
   const [playing, setPlaying] = useState(false)
   const [speedKey, setSpeedKey] = useState("1x")
   const [windowMode, setWindowMode] = useState<WindowMode>("single")
+  const [query, setQuery] = useState("")
 
   const months = useMemo(
     () => Array.from(new Set(records.map((r) => r.mon))).sort(),
@@ -125,47 +165,35 @@ export function TimelineView({ records }: { records: RankRow[] }) {
   }
 
   // 場所の集約（指標で降順）。直近 windowSize バケットぶんの月をまとめて合計する
-  // ローリング集計。place_id で集約し、表示名/URI は最新月の値を代表採用（records は mon 昇順）
   const items = useMemo<PlaceItem[]>(() => {
     if (!buckets.length) return []
     const set = new Set<string>()
     for (let i = winLo; i <= safePos; i++) {
       for (const m of buckets[i]?.months ?? []) set.add(m)
     }
-    const agg = new Map<string, PlaceItem>()
-    for (const r of records) {
-      if (!set.has(r.mon)) continue
-      const a =
-        agg.get(r.placeId) ??
-        ({
-          name: r.place_name,
-          placeId: r.placeId,
-          uri: r.uri,
-          lat: r.lat,
-          lng: r.lng,
-          visits: 0,
-          hours: 0,
-        } as PlaceItem)
-      a.visits += r.visits
-      a.hours += r.hours
-      if (r.place_name) a.name = r.place_name
-      if (r.uri) a.uri = r.uri
-      if (a.lat == null && r.lat != null) a.lat = r.lat
-      if (a.lng == null && r.lng != null) a.lng = r.lng
-      agg.set(r.placeId, a)
-    }
-    return Array.from(agg.values()).sort((x, y) =>
-      metric === "hours" ? y.hours - x.hours : y.visits - x.visits
-    )
+    return aggregatePlaces(records, (r) => set.has(r.mon), metric)
   }, [records, buckets, winLo, safePos, metric])
 
+  // 名前検索は期間と独立に全期間から探す（「あの店いつ行ったっけ」に答えるため。
+  // 期間内フィルタだと窓の外の場所が見つからない）
+  const searchItems = useMemo<PlaceItem[] | null>(() => {
+    const q = normalize(query.trim())
+    if (!q) return null
+    return aggregatePlaces(records, (r) => normalize(r.place_name).includes(q), metric)
+  }, [records, query, metric])
+
+  const searching = searchItems !== null
+  const shownItems = searchItems ?? items
+
   // 選択中の場所（place_id 一致）。期間切替で対象が消えたら null 扱い
-  const cur = useMemo(() => items.find((i) => i.placeId === selectedId), [items, selectedId])
+  const cur = useMemo(() => shownItems.find((i) => i.placeId === selectedId), [shownItems, selectedId])
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 flex-wrap">
-        <CardTitle className="text-xl font-bold tabular-nums">{windowLabel}</CardTitle>
+        <CardTitle className="text-xl font-bold tabular-nums">
+          {searching ? "検索結果" : windowLabel}
+        </CardTitle>
         <div className="flex gap-2 flex-wrap">
           <Toggle options={UNIT_OPTIONS} value={unit} onChange={changeUnit} />
           <Toggle options={WINDOW_OPTIONS} value={windowMode} onChange={setWindowMode} />
@@ -173,8 +201,38 @@ export function TimelineView({ records }: { records: RankRow[] }) {
         </div>
       </CardHeader>
       <CardContent>
+        {/* 場所名の検索。入力中は期間を無視して全期間から探す */}
+        <div className="relative mb-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setPlaying(false)
+            }}
+            placeholder="場所名で検索（全期間から）"
+            aria-label="場所名で検索"
+            className="h-9 w-full rounded-md border bg-background pl-9 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              aria-label="検索をクリア"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {searching && (
+          <p className="text-xs text-muted-foreground">
+            「{query.trim()}」に一致: {shownItems.length} ヶ所（全期間の合計）
+          </p>
+        )}
+
         {/* 期間ナビ（両タブ共有）: 矢印で前後、ドロップダウンで任意の期間へジャンプ */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className={`flex flex-wrap items-center gap-3 ${searching ? "hidden" : ""}`}>
           <button
             className="h-9 w-9 rounded-md border bg-muted disabled:opacity-30"
             disabled={safePos <= 0}
@@ -223,9 +281,11 @@ export function TimelineView({ records }: { records: RankRow[] }) {
           </button>
           <Toggle options={SPEEDS.map((s) => ({ key: s.key, label: s.key }))} value={speedKey} onChange={setSpeedKey} />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground tabular-nums">
-          全{buckets.length}期間中 {safePos + 1}番目・{windowNote}
-        </p>
+        {!searching && (
+          <p className="mt-2 text-xs text-muted-foreground tabular-nums">
+            全{buckets.length}期間中 {safePos + 1}番目・{windowNote}
+          </p>
+        )}
 
         <Tabs
           value={tab}
@@ -239,7 +299,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
 
           <TabsContent value="ranking" className="mt-4">
             <TimelineExplorer
-              items={items}
+              items={shownItems}
               records={records}
               buckets={buckets}
               safePos={safePos}
@@ -248,6 +308,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
               selectedId={selectedId}
               onSelect={setSelectedId}
               transitionSec={transitionSec}
+              emptyMessage={searching ? "一致する場所がありません" : undefined}
             />
           </TabsContent>
 
@@ -255,7 +316,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
             <div className="flex flex-col gap-4 lg:flex-row">
               <div className="min-w-0 lg:flex-1">
                 <TimelineMap
-                  items={items}
+                  items={shownItems}
                   metric={metric}
                   selectedId={selectedId}
                   onSelect={setSelectedId}

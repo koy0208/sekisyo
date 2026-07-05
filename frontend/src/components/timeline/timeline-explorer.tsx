@@ -25,6 +25,7 @@ export function TimelineExplorer({
   selectedId,
   onSelect,
   transitionSec = 0.4,
+  emptyMessage = "この期間のデータがありません",
 }: {
   items: PlaceItem[]
   records: RankRow[]
@@ -36,6 +37,7 @@ export function TimelineExplorer({
   onSelect: (placeId: string | null) => void
   // レース再生時の並べ替え/バー伸縮アニメの長さ（秒）。再生速度に追従
   transitionSec?: number
+  emptyMessage?: string
 }) {
   const maxVal = Math.max(...items.map((i) => (metric === "hours" ? i.hours : i.visits)), 1)
   const cur = items.find((i) => i.placeId === selectedId)
@@ -103,7 +105,7 @@ export function TimelineExplorer({
             })}
           </AnimatePresence>
           {items.length === 0 && (
-            <div className="py-10 text-center text-sm text-muted-foreground">この期間のデータがありません</div>
+            <div className="py-10 text-center text-sm text-muted-foreground">{emptyMessage}</div>
           )}
         </div>
       </div>
