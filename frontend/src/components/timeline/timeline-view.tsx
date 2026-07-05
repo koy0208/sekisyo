@@ -97,6 +97,7 @@ export function TimelineView({ records }: { records: RankRow[] }) {
   const [speedKey, setSpeedKey] = useState("1x")
   const [windowMode, setWindowMode] = useState<WindowMode>("single")
   const [query, setQuery] = useState("")
+  const [suggestOpen, setSuggestOpen] = useState(false)
 
   const months = useMemo(
     () => Array.from(new Set(records.map((r) => r.mon))).sort(),
@@ -184,6 +185,15 @@ export function TimelineView({ records }: { records: RankRow[] }) {
 
   const searching = searchItems !== null
   const shownItems = searchItems ?? items
+  // 入力欄直下のドロップダウン候補 (上位のみ。全件は下の一覧で見る)
+  const suggestions = suggestOpen ? (searchItems ?? []).slice(0, 8) : []
+
+  // 候補クリックで場所を選択して詳細を開く。query は残す
+  // (クリアすると期間ビューに戻り、窓の外の場所は選択が解決できなくなるため)
+  function pickSuggestion(placeId: string) {
+    setSelectedId(placeId)
+    setSuggestOpen(false)
+  }
 
   // 選択中の場所（place_id 一致）。期間切替で対象が消えたら null 扱い
   const cur = useMemo(() => shownItems.find((i) => i.placeId === selectedId), [shownItems, selectedId])
@@ -208,7 +218,13 @@ export function TimelineView({ records }: { records: RankRow[] }) {
             value={query}
             onChange={(e) => {
               setQuery(e.target.value)
+              setSuggestOpen(true)
               setPlaying(false)
+            }}
+            onFocus={() => setSuggestOpen(true)}
+            onBlur={() => setSuggestOpen(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setSuggestOpen(false)
             }}
             placeholder="場所名で検索（全期間から）"
             aria-label="場所名で検索"
@@ -222,6 +238,28 @@ export function TimelineView({ records }: { records: RankRow[] }) {
             >
               <X className="h-4 w-4" />
             </button>
+          )}
+
+          {/* 入力欄直下の候補。クリックで選択して詳細を開く (両タブ共通)。
+              onMouseDown で input の blur より先に選択を確定させる */}
+          {suggestions.length > 0 && (
+            <div className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-md border bg-card shadow-md">
+              {suggestions.map((s) => (
+                <button
+                  key={s.placeId}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    pickSuggestion(s.placeId)
+                  }}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted"
+                >
+                  <span className="truncate">{s.name}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {s.hours.toFixed(1)}h / {s.visits}回
+                  </span>
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
