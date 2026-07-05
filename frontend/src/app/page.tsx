@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatsCard } from "@/components/dashboard/stats-card"
 import { DataError } from "@/components/shared/data-error"
+import { SyncButton } from "@/components/home/sync-button"
 import { fetchMart } from "@/lib/marts"
 import { type DailyRow, type MartMeta } from "@/lib/mart-types"
 import { settle, shortDate, shiftDate } from "@/lib/utils"
@@ -231,17 +232,20 @@ export default async function HomePage({
           </CardContent>
         </Card>
 
-        {meta && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4" />
-              データ更新:
-            </span>
-            <span>Fitbit {meta.sources.fitbit.last_date ? shortDate(meta.sources.fitbit.last_date) : "不明"}</span>
-            <span>家計簿 {meta.sources.budget.last_date ? shortDate(meta.sources.budget.last_date) : "不明"}</span>
-            <span>位置情報 {meta.sources.timeline.last_date ? shortDate(meta.sources.timeline.last_date) : "不明"}</span>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+          {meta && (
+            <>
+              <span className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4" />
+                データ更新:
+              </span>
+              <span>Fitbit {meta.sources.fitbit.last_date ? shortDate(meta.sources.fitbit.last_date) : "不明"}</span>
+              <span>家計簿 {meta.sources.budget.last_date ? shortDate(meta.sources.budget.last_date) : "不明"}</span>
+              <span>位置情報 {meta.sources.timeline.last_date ? shortDate(meta.sources.timeline.last_date) : "不明"}</span>
+            </>
+          )}
+          <SyncButton baseline={meta?.generated_at ?? null} />
+        </div>
       </div>
     </div>
   )

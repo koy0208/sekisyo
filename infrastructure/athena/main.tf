@@ -125,10 +125,13 @@ resource "aws_iam_access_key" "app_user_key" {
   user = aws_iam_user.app_user.name
 }
 
+data "aws_caller_identity" "current" {}
+
 # アプリ用 IAM ポリシー。
 # 表示パスのマート移行(docs/redesign/02-data-layer.md)後は marts/ の
 # GetObject のみに縮小。Athena/Glue はアドホック分析用に残すが、
 # フロントのユーザーからは権限を外す(生データ data/** も読ませない)。
+# データ連携の手動トリガー(sync-runner)の起動のみ追加で許可する。
 resource "aws_iam_user_policy" "app_policy" {
   name = "${var.project_name}-policy"
   user = aws_iam_user.app_user.name
@@ -140,6 +143,11 @@ resource "aws_iam_user_policy" "app_policy" {
         Action   = ["s3:GetObject"]
         Effect   = "Allow"
         Resource = ["${aws_s3_bucket.data_bucket.arn}/marts/*"]
+      },
+      {
+        Action   = ["lambda:InvokeFunction"]
+        Effect   = "Allow"
+        Resource = ["arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:sync-runner-lambda"]
       }
     ]
   })
