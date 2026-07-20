@@ -1,5 +1,7 @@
 import json
 import os
+import re
+from datetime import datetime, timezone
 from io import BytesIO
 from urllib.parse import unquote_plus
 
@@ -14,6 +16,12 @@ from PIL import Image, ImageOps
 S3_BUCKET = "fitbit-dashboard"
 INPUT_PREFIX = os.environ.get("PHOTOS_INPUT_PREFIX", "data/photos/")
 OUTPUT_PREFIX = os.environ.get("PHOTOS_OUTPUT_PREFIX", "data/photos_aligned/")
+
+# フロントエンド用インデックス。表示パスは marts/*.json だけを読む設計
+# (docs/redesign/02-data-layer.md) のため、一覧もマートとして出力する。
+# 型は frontend/src/lib/mart-types.ts の FacePhotosMart と手動同期
+INDEX_KEY = os.environ.get("PHOTOS_INDEX_KEY", "marts/face_photos.json")
+FILE_NAME_PATTERN = re.compile(r"^(\d{4})(\d{2})(\d{2})_\d+\.jpe?g$", re.IGNORECASE)
 
 # BlazeFace (short-range) モデル。リポジトリに同梱し Docker イメージへコピーする
 MODEL_PATH = os.path.join(
@@ -177,6 +185,38 @@ def collect_backfill_keys():
     ]
 
 
+def write_index():
+    """出力プレフィックスの全ファイルから marts/face_photos.json を再生成する"""
+    photos = []
+    for key in sorted(list_keys(OUTPUT_PREFIX)):
+        name = key[len(OUTPUT_PREFIX):]
+        match = FILE_NAME_PATTERN.match(name)
+        if not match:
+            continue
+        photos.append(
+            {
+                "file": name,
+                "date": f"{match.group(1)}-{match.group(2)}-{match.group(3)}",
+            }
+        )
+
+    body = json.dumps(
+        {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "photos": photos,
+        },
+        ensure_ascii=False,
+    )
+    s3_client.put_object(
+        Bucket=S3_BUCKET,
+        Key=INDEX_KEY,
+        Body=body.encode("utf-8"),
+        ContentType="application/json",
+    )
+    print(f"index written: {INDEX_KEY} ({len(photos)} photos)")
+    return len(photos)
+
+
 def handler(event, context):
     """
     Lambda エントリポイント。2 つの起動モードを持つ。
@@ -204,12 +244,16 @@ def handler(event, context):
         if not aligned:
             fallback_count += 1
 
+    # 0件処理でもインデックスは再生成する (フォーマット変更時の再構築を兼ねる)
+    index_count = write_index()
+
     return {
         "statusCode": 200,
         "body": json.dumps(
             {
                 "processed": len(results),
                 "fallback": fallback_count,
+                "index_count": index_count,
             }
         ),
     }

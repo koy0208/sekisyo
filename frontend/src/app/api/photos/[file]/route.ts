@@ -1,7 +1,8 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3"
-import { ALIGNED_PHOTOS_PREFIX } from "@/lib/photos"
 
 export const runtime = "edge"
+
+const ALIGNED_PHOTOS_PREFIX = "data/photos_aligned/"
 
 // 整列済み顔写真の配信プロキシ。
 // presigned URL は URL さえ知っていれば Cloudflare Access を迂回して

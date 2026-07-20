@@ -45,9 +45,13 @@ data "aws_iam_policy_document" "face_align_lambda_policy" {
   }
 
   statement {
-    effect    = "Allow"
-    actions   = ["s3:PutObject"]
-    resources = ["arn:aws:s3:::${local.data_bucket}/data/photos_aligned/*"]
+    effect  = "Allow"
+    actions = ["s3:PutObject"]
+    resources = [
+      "arn:aws:s3:::${local.data_bucket}/data/photos_aligned/*",
+      # フロントエンド用インデックス (表示パスは marts/*.json のみを読む設計)
+      "arn:aws:s3:::${local.data_bucket}/marts/face_photos.json",
+    ]
   }
 
   # backfill 時の未処理チェック用一覧取得

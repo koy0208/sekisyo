@@ -10,6 +10,17 @@ export type MartMeta = {
   }
 }
 
+// marts/face_photos.json (生成側は etl/face_align/lambda_function.py)
+export type FacePhoto = {
+  file: string // 例: "20231225_194534512.jpg"
+  date: string // 例: "2023-12-25"
+}
+
+export type FacePhotosMart = {
+  generated_at: string
+  photos: FacePhoto[]
+}
+
 // marts/activity_daily.json
 export type ActivityDailyRow = {
   date: string
