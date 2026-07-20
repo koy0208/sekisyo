@@ -104,8 +104,8 @@ resource "aws_lambda_function" "timeline_to_parquet" {
 #######################################
 # S3 PutObject トリガー
 #   注意: aws_s3_bucket_notification はバケットの通知設定を「上書き」する。
-#   fitbit-dashboard に他の通知が無いことを確認済み。将来追加する場合は
-#   このリソースに統合すること。
+#   そのためバケットの全 S3 トリガーをこのリソースに統合している
+#   (face_align の写真トリガーもここ。将来追加する場合も同様に統合すること)。
 #######################################
 resource "aws_lambda_permission" "allow_s3_invoke_timeline" {
   statement_id  = "AllowS3InvokeTimelineLambda"
@@ -125,5 +125,16 @@ resource "aws_s3_bucket_notification" "timeline_json_uploaded" {
     filter_suffix       = ".json"
   }
 
-  depends_on = [aws_lambda_permission.allow_s3_invoke_timeline]
+  # 顔写真の整列 (face_align.tf)
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.face_align.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "data/photos/"
+    filter_suffix       = ".jpg"
+  }
+
+  depends_on = [
+    aws_lambda_permission.allow_s3_invoke_timeline,
+    aws_lambda_permission.allow_s3_invoke_face_align,
+  ]
 }
