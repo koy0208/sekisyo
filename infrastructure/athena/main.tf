@@ -144,6 +144,21 @@ resource "aws_iam_user_policy" "app_policy" {
         Effect   = "Allow"
         Resource = ["${aws_s3_bucket.data_bucket.arn}/marts/*"]
       },
+      # 顔タイムラプス (/face) 用。整列済み写真はマートと同じ表示用の
+      # 派生データなので許可する。元写真 (data/photos/) は引き続き読ませない
+      {
+        Action   = ["s3:GetObject"]
+        Effect   = "Allow"
+        Resource = ["${aws_s3_bucket.data_bucket.arn}/data/photos_aligned/*"]
+      },
+      {
+        Action   = ["s3:ListBucket"]
+        Effect   = "Allow"
+        Resource = [aws_s3_bucket.data_bucket.arn]
+        Condition = {
+          StringLike = { "s3:prefix" = ["data/photos_aligned/*"] }
+        }
+      },
       {
         Action   = ["lambda:InvokeFunction"]
         Effect   = "Allow"
