@@ -57,3 +57,4 @@ Phase 3・4 は薄い UI 実装になる。
 - [03-ui-unification.md](./03-ui-unification.md) — 期間モデル統一・言語統一・統合ホーム
 - [04-cross-features.md](./04-cross-features.md) — デイビュー・相関・目標・通知
 - [../ai-agent-design.md](../ai-agent-design.md) — AI エージェント機能(既存設計。Phase 4 で接続)
+- [../backend-design.md](../backend-design.md) — 簡易バックエンド(DynamoDB + Server Actions 直接 / Lambda Function URL)
