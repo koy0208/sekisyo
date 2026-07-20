@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime, timezone
 from io import BytesIO
 
 import boto3
@@ -92,6 +93,26 @@ def download_file(service, file_id, mime_type):
     return buffer
 
 
+def list_existing_objects(s3_prefix):
+    """S3プレフィックス配下の既存オブジェクトを {キー: 最終更新日時} で返す"""
+    existing = {}
+    paginator = s3_client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=s3_prefix):
+        for obj in page.get("Contents", []):
+            existing[obj["Key"]] = obj["LastModified"]
+    return existing
+
+
+def is_up_to_date(s3_key, drive_modified_time, existing_objects):
+    """S3側がDrive側の更新日時以降なら転送不要"""
+    if s3_key not in existing_objects:
+        return False
+    modified_at = datetime.fromisoformat(
+        drive_modified_time.replace("Z", "+00:00")
+    ).astimezone(timezone.utc)
+    return existing_objects[s3_key] >= modified_at
+
+
 def determine_s3_key(file_name, mime_type, s3_prefix):
     """ファイル名とMIMEタイプからS3キーを決定"""
     if mime_type in EXPORT_MIME_TYPES:
@@ -100,9 +121,11 @@ def determine_s3_key(file_name, mime_type, s3_prefix):
     return f"{s3_prefix}{file_name}"
 
 
-def upload_to_s3(buffer, s3_key):
+def upload_to_s3(buffer, s3_key, content_type):
     """バイトストリームをS3にアップロード"""
-    s3_client.upload_fileobj(buffer, S3_BUCKET, s3_key)
+    s3_client.upload_fileobj(
+        buffer, S3_BUCKET, s3_key, ExtraArgs={"ContentType": content_type}
+    )
     print(f"Uploaded to s3://{S3_BUCKET}/{s3_key}")
 
 
@@ -135,20 +158,33 @@ def handler(event, context):
 
         # フォルダ内のファイル一覧を取得（同名は最新のみ）
         files = list_files_in_folder(service, folder_id)
-        print(f"Folder {folder_id}: {len(files)} files to sync")
+        existing_objects = list_existing_objects(s3_prefix)
+        print(f"Folder {folder_id}: {len(files)} files found")
 
+        uploaded = 0
+        skipped = 0
         for file_meta in files:
             file_name = file_meta["name"]
             mime_type = file_meta["mimeType"]
             file_id = file_meta["id"]
-            print(f"Processing: {file_name} (type: {mime_type}, modified: {file_meta['modifiedTime']})")
-
-            buffer = download_file(service, file_id, mime_type)
 
             s3_key = determine_s3_key(file_name, mime_type, s3_prefix)
-            upload_to_s3(buffer, s3_key)
 
+            # 差分同期: S3側がDrive側の更新日時以降ならスキップ
+            if is_up_to_date(s3_key, file_meta["modifiedTime"], existing_objects):
+                skipped += 1
+                continue
+
+            print(f"Processing: {file_name} (type: {mime_type}, modified: {file_meta['modifiedTime']})")
+            buffer = download_file(service, file_id, mime_type)
+
+            content_type = EXPORT_MIME_TYPES.get(mime_type, mime_type)
+            upload_to_s3(buffer, s3_key, content_type)
+
+            uploaded += 1
             results.append({"file": file_name, "s3_key": s3_key})
+
+        print(f"Folder {folder_id}: {uploaded} uploaded, {skipped} skipped (up to date)")
 
     return {
         "statusCode": 200,

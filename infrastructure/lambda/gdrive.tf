@@ -51,6 +51,19 @@ data "aws_iam_policy_document" "gdrive_lambda_policy" {
     actions   = ["s3:PutObject", "s3:GetObject"]
     resources = ["arn:aws:s3:::fitbit-dashboard/*"]
   }
+
+  # S3 一覧取得 (差分同期の既存オブジェクトチェック用)
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = ["arn:aws:s3:::fitbit-dashboard"]
+
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["data/*"]
+    }
+  }
 }
 
 resource "aws_iam_policy" "gdrive_lambda_policy" {
@@ -78,12 +91,13 @@ resource "aws_lambda_function" "gdrive_to_s3" {
   environment {
     variables = {
       # フォーマット: "folder_id:s3_prefix,folder_id:s3_prefix,..."
-      GDRIVE_FOLDER_IDS = "1tzfP5kWWsOBRwSMIt_OVYft9TmPnWOBw:data/household_budget/,1ORZWeQW13Z_aMQQne7zWDWDcdU40kah3:data/gdrive/timeline/"
+      GDRIVE_FOLDER_IDS = "1tzfP5kWWsOBRwSMIt_OVYft9TmPnWOBw:data/household_budget/,1ORZWeQW13Z_aMQQne7zWDWDcdU40kah3:data/gdrive/timeline/,1nPUpn2kNDtwzQP_IrlbNSt-YqDLwq0ie:data/photos/"
     }
   }
 
   memory_size = 512
-  timeout     = 300
+  # 写真の初回全件転送に時間がかかるため延長 (2 回目以降は差分同期で短時間)
+  timeout     = 900
 }
 
 #######################################
