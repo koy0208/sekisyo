@@ -5,7 +5,7 @@ import { Pause, Play, SkipBack, SkipForward } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { FacePhoto } from "@/lib/photos"
+import type { FacePhoto } from "@/lib/mart-types"
 
 // 顔タイムラプスの操作 UI。
 // 写真は整列済み (両目が固定座標) なので、単純に img を差し替えるだけで
