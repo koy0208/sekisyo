@@ -1,9 +1,9 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatsCard } from "@/components/dashboard/stats-card"
 import { DataError } from "@/components/shared/data-error"
 import { DayTimeline } from "@/components/timeline/day-timeline"
+import { DayDateNav } from "@/components/timeline/day-date-nav"
 import { mapDayEvents } from "@/components/timeline/day-utils"
 import { fetchMart, fetchMartOrNull } from "@/lib/marts"
 import {
@@ -11,8 +11,8 @@ import {
   type DailyRow,
   type TimelineDayEventRow,
 } from "@/lib/mart-types"
-import { settle, shiftDate } from "@/lib/utils"
-import { Activity, Moon, Flame, Wallet, ChevronLeft, ChevronRight } from "lucide-react"
+import { settle } from "@/lib/utils"
+import { Activity, Moon, Flame, Wallet } from "lucide-react"
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
@@ -24,27 +24,6 @@ export const runtime = 'edge'
 function longDate(isoDate: string): string {
   const d = new Date(`${isoDate}T12:00:00`)
   return d.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "short" })
-}
-
-function NavButton({ href, disabled, dir }: { href: string; disabled: boolean; dir: "prev" | "next" }) {
-  const Icon = dir === "prev" ? ChevronLeft : ChevronRight
-  const label = dir === "prev" ? "前の日" : "次の日"
-  if (disabled) {
-    return (
-      <span className="flex h-9 w-9 items-center justify-center rounded-md border bg-muted opacity-30">
-        <Icon className="h-4 w-4" />
-      </span>
-    )
-  }
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      className="flex h-9 w-9 items-center justify-center rounded-md border bg-muted transition-colors hover:bg-muted/70"
-    >
-      <Icon className="h-4 w-4" />
-    </Link>
-  )
 }
 
 export default async function DayPage({
@@ -73,10 +52,7 @@ export default async function DayPage({
       <div className="flex-1 space-y-4 p-4 md:p-8 md:pt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">{longDate(date)}</h2>
-          <div className="flex items-center gap-2">
-            <NavButton href={`/day/${shiftDate(date, -1)}`} disabled={!!minDate && date <= minDate} dir="prev" />
-            <NavButton href={`/day/${shiftDate(date, 1)}`} disabled={!!maxDate && date >= maxDate} dir="next" />
-          </div>
+          <DayDateNav date={date} minDate={minDate} maxDate={maxDate} />
         </div>
 
         {!dailyMart && (
