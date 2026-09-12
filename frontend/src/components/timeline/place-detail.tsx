@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Bar, BarChart, XAxis, YAxis, Tooltip, Cell } from "recharts"
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart"
 import { MapPin, X, Loader2 } from "lucide-react"
@@ -37,6 +39,7 @@ export function PlaceDetail({
   metric: Metric
   onClose?: () => void
 }) {
+  const router = useRouter()
   const [sortKey, setSortKey] = useState<SortKey>("date")
   const [sortDir, setSortDir] = useState<number>(-1)
 
@@ -152,7 +155,9 @@ export function PlaceDetail({
         </BarChart>
       </ChartContainer>
 
-      <div className="text-xs text-muted-foreground mt-4 mb-1">訪問明細</div>
+      <div className="text-xs text-muted-foreground mt-4 mb-1">
+        訪問明細（行をクリックでその日のデイビューへ）
+      </div>
       <div className="max-h-[200px] overflow-auto rounded-md border">
         <table className="w-full text-xs tabular-nums">
           <thead className="sticky top-0 bg-card">
@@ -177,8 +182,23 @@ export function PlaceDetail({
               </tr>
             ) : (
               sortedVisits.map((v, i) => (
-                <tr key={i} className="border-t">
-                  <td className="px-2 py-1">{v.date}</td>
+                // 行全体をクリック可能にしつつ、日付セルは Link にして
+                // 新規タブで開く/キーボード操作もできるようにする
+                <tr
+                  key={i}
+                  onClick={() => router.push(`/day/${v.date}`)}
+                  title={`${v.date} のデイビューを開く`}
+                  className="border-t cursor-pointer hover:bg-muted"
+                >
+                  <td className="px-2 py-1">
+                    <Link
+                      href={`/day/${v.date}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-primary hover:underline"
+                    >
+                      {v.date}
+                    </Link>
+                  </td>
                   <td className={cn("px-2 py-1", WEEKEND.has(v.dow) && "text-amber-500")}>{v.dow}</td>
                   <td className="px-2 py-1">{v.in}</td>
                   <td className="px-2 py-1">{v.out}</td>
